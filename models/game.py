@@ -10,6 +10,10 @@ class Value(IntEnum):
     Tie = 1
     Win = 2
 
+class StringMode(IntEnum):
+    Readable = 0
+    AUTOGUI = 1
+
 
 class Game(ABC, Generic[State]):
     @abstractmethod
@@ -44,4 +48,23 @@ class Game(ABC, Generic[State]):
         """
         pass
 
-    
+    @abstractmethod
+    def to_string(self, position: State, mode: StringMode) -> str:
+        """
+        Returns a string representation of the position based on the given mode.
+        """
+        pass
+
+    @abstractmethod
+    def from_string(self, strposition: str) -> State:
+        """
+        Returns the position from a string representation of the position.
+        """
+        pass
+
+    @abstractmethod
+    def move_to_string(self, move: State) -> str:
+        """
+        Returns a string representation of the move based on the given mode.
+        """
+        pass

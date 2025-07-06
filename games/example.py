@@ -2,8 +2,9 @@ from models.game import Game, Value
 from typing import Optional
 
 class Example(Game[int]):
-    def __init__(self):
+    def __init__(self, variant_id: str = "default"):
         self.id = 'example'
+        self.variant = variant_id
         self.n_players = 1
         self.cyclic = False
 
