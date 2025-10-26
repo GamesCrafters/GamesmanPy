@@ -1,7 +1,8 @@
-from solver.acyclic import AcyclicSolver
-from games.ten_to_zero import TenToZero
+from solver import AcyclicSolver
+from games import game_list
 
-t = TenToZero()
-s = AcyclicSolver(t)
-s.solve(overwrite=True)
-s.print()
+
+for game in game_list.values():
+  s = AcyclicSolver(game)
+  s.solve(overwrite=True)
+  s.print()

@@ -4,8 +4,9 @@ from typing import Optional
 import os
 
 class GameDB:
-    def __init__(self, id: str):
-        self.path = f'{Path(__file__).parent}/db/{id}.db'
+    def __init__(self, id: str, variant: str):
+        file_name = f'{id}_{variant}'
+        self.path = f'{Path(__file__).resolve().parents[2]}/db/{file_name}.db'
         self.exists = os.path.exists(self.path)
         self.db = sql.connect(self.path)
         self.cursor = self.db.cursor()

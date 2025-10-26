@@ -1,4 +1,4 @@
-from solver.acyclic import AcyclicSolver
+from solver.src.acyclic import AcyclicSolver
 from database.database import PuzzleDB
 
 class TUI:

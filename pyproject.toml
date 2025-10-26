@@ -7,7 +7,35 @@ requires-python = ">=3.12"
 dependencies = [
     "flask>=3.1.0",
     "waitress>=3.0.2",
+    "database",
+    "games",
+    "interfaces",
+    "models",
+    "server",
+    "solver",
 ]
 
-[workspace]
-members = ["database", "solver", "models", "server", "interfaces", "games"]
+[tool.uv.workspace]
+members = [
+    "database",
+    "games",
+    "interfaces",
+    "models",
+    "server",
+    "solver",
+]
+
+[tool.uv.sources]
+database = { workspace = true }
+games = { workspace = true }
+interfaces = { workspace = true }
+models = { workspace = true }
+server = { workspace = true }
+solver = { workspace = true }
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/server"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

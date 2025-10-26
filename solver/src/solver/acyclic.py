@@ -1,6 +1,6 @@
 from collections import deque
-from models.game import Game, Value
-from database.database import GameDB
+from models import Game, Value
+from database import GameDB
 
 REMOTENESS_TERMINAL = 0
 
@@ -11,14 +11,15 @@ class AcyclicSolver:
         self.parent_map = {}
 
     def solve(self, overwrite=False):
-        self.db = GameDB(self.game.id)
-        if overwrite or not self.db.exists:
-            self.db.create_table(overwrite)
-            self.discover()
-            print("discovered")
-            self.propagate()
-            print("solved")
-            self.db.insert(self.solution)
+        for variant in self.game.variants:
+          self.db = GameDB(self.game.id, variant)
+          if overwrite or not self.db.exists:
+              self.db.create_table(overwrite)
+              self.discover()
+              print("discovered")
+              self.propagate()
+              print("solved")
+              self.db.insert(self.solution)
 
     def get_children(self, position):
         moves = self.game.generate_moves(position)

@@ -1,4 +1,20 @@
 [project]
 name = "models"
 version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "michael-wsp", email = "michaelsp@berkeley.edu" }
+]
+requires-python = ">=3.12"
 dependencies = []
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/models"]
+
+[project.scripts]
+models = "models:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

@@ -1,8 +1,20 @@
 [project]
 name = "server"
 version = "0.1.0"
-dependencies = [
-    "solver",
-    "database",
-    "games",
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "michael-wsp", email = "michaelsp@berkeley.edu" }
 ]
+requires-python = ">=3.12"
+dependencies = []
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/server"]
+
+[project.scripts]
+server = "server:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

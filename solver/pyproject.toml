@@ -1,7 +1,20 @@
 [project]
 name = "solver"
 version = "0.1.0"
-dependencies = [
-    "game",
-    "database",
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "michael-wsp", email = "michaelsp@berkeley.edu" }
 ]
+requires-python = ">=3.12"
+dependencies = []
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/solver"]
+
+[project.scripts]
+solver = "solver:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
