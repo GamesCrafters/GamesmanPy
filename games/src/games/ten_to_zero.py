@@ -1,7 +1,7 @@
 from models import Game, Value
 from typing import Optional
 
-class TenToZero(Game[int]):
+class TenToZero(Game):
     id = 'ten-to-zero'
     variants = ['default']
     n_players = 2

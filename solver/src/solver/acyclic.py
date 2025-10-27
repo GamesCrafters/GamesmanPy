@@ -19,6 +19,7 @@ class AcyclicSolver:
               print("discovered")
               self.propagate()
               print("solved")
+              print(self.solution)
               self.db.insert(self.solution)
 
     def get_children(self, position):

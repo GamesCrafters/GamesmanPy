@@ -10,6 +10,7 @@ class GameDB:
         self.exists = os.path.exists(self.path)
         self.db = sql.connect(self.path)
         self.cursor = self.db.cursor()
+        print(self.exists)
 
     def create_table(self, overwrite=True):
         '''
