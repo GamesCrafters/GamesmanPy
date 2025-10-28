@@ -1,7 +1,7 @@
 from flask import Flask, abort, request
 from waitress import serve
-from games import getGame
-from models import StringMode
+from games import get_game
+from models import *
 from database import GameDB
 
 app = Flask("GamesmanPyServer")
@@ -11,9 +11,10 @@ ERR_POS = -1
 
 @app.route('/<game_id>/<variant_id>/start/', methods=['GET'])
 def get_start_pos(game_id: str, variant_id: str):
-    game = getGame(game_id, variant_id)
-    if game is None:
-        abort(404, description="Game/Variant combination not found")
+    game = get_game(game_id, variant_id)
+    match game:
+        case Ok(value): game = value
+        case Err(error): abort(404, description=error)
     pos = game.start()
     return {
         'position': game.to_string(pos, StringMode.Readable),
@@ -25,12 +26,17 @@ def get_pos(game_id: str, variant_id: str):
     stringpos = request.args.get('p', None)
     if stringpos is None:
         abort(404, description="Empty position")
-    game = getGame(game_id, variant_id)
-    if game is None:
-        abort(404, description="Game not found")
+    game_res = get_game(game_id, variant_id)
+    game = None
+    match game_res:
+        case Ok(value): game = value
+        case Err(error): abort(404, description=error)
     pos = game.from_string(stringpos)
     db = GameDB(game_id, variant_id)
-    (rem, val) = db.get(pos)
+    entry = db.get(pos)
+    if entry is None:
+        abort(404, "Position not in database.")
+    (rem, val) = entry
     moves = game.generate_moves(pos)
     move_objs = []
     for move in moves:

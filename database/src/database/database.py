@@ -2,28 +2,28 @@ import sqlite3 as sql
 from pathlib import Path
 from typing import Optional
 import os
+from games import get_game
 
 class GameDB:
     def __init__(self, id: str, variant: str):
+        game_res = get_game(id, variant)
+        if game_res.is_err():
+            raise ValueError(game_res.unwrap_err())
+
         file_name = f'{id}_{variant}'
         self.path = f'{Path(__file__).resolve().parents[2]}/db/{file_name}.db'
         self.exists = os.path.exists(self.path)
         self.db = sql.connect(self.path)
         self.cursor = self.db.cursor()
-        print(self.exists)
 
     def create_table(self, overwrite=True):
         '''
-        Attempts to open the db file.
+        Attempts to create a `gamedb` sqlite database within the file.
         
-        If create is set to True, the file will be created if it does not exist. 
-        If False is returned, do not attempt to interact with the database with other methods.
+        If overwrite is set to True, the table will be overwritten if it already exists. 
 
         Parameters:
-            create (bool, optional): Determines whether or not a new file should be created. Defaults to True.
-
-        Returns:
-            bool: Whether or not the file was successfully opened.
+            overwrite (bool, optional): Determines whether or not the table should be overwritten. Defaults to True.
         '''
         if overwrite:
             self.cursor.execute('DROP TABLE IF EXISTS gamedb')

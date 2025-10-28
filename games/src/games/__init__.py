@@ -1,4 +1,4 @@
-from .game_manager import getGame, game_list
+from .game_manager import get_game, game_list
 
 def main() -> None:
     print("Hello from games!")

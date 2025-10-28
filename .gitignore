@@ -11,3 +11,6 @@ wheels/
 
 # DB files
 *.db
+
+# Other
+.DS_Store

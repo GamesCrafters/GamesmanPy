@@ -13,7 +13,7 @@ class Game(ABC):
         """
         Returns the starting position of the game.
         """
-        pass
+        raise NotImplementedError("start() not implemented.")
     
     @staticmethod
     @abstractmethod
@@ -21,7 +21,7 @@ class Game(ABC):
         """
         Returns a list of positions given the input position.
         """
-        pass
+        raise NotImplementedError("generate_moves() not implemented.")
     
     @staticmethod
     @abstractmethod
@@ -29,7 +29,7 @@ class Game(ABC):
         """
         Returns the resulting position of applying move to position.
         """
-        pass
+        raise NotImplementedError("do_move() not implemented.")
 
     @staticmethod
     @abstractmethod
@@ -37,7 +37,7 @@ class Game(ABC):
         """
         Returns a Value enum which defines whether the current position is a win, loss, or non-terminal. 
         """
-        pass
+        raise NotImplementedError("primitive() not implemented.")
 
     @staticmethod
     @abstractmethod
@@ -45,7 +45,7 @@ class Game(ABC):
         """
         Returns a string representation of the position based on the given mode.
         """
-        pass
+        raise NotImplementedError("to_string() not implemented.")
 
     @staticmethod
     @abstractmethod
@@ -54,7 +54,7 @@ class Game(ABC):
         Returns the position from a string representation of the position.
         Input string is StringMode.Readable.
         """
-        pass
+        raise NotImplementedError("from_string() not implemented.")
 
     @staticmethod
     @abstractmethod
@@ -62,4 +62,4 @@ class Game(ABC):
         """
         Returns a string representation of the move based on the given mode.
         """
-        pass
+        raise NotImplementedError("move_to_string() not implemented.")
