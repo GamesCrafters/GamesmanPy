@@ -14,6 +14,8 @@ class TTT_inf(Game):
     
     @abstractmethod
     def generate_moves(position: int) -> list[int]:
+        if TTT_inf.primitive(position) is not None:
+            return []
         move_age = 0b001
         free = []
         mask_token = 0b1000
@@ -103,7 +105,7 @@ class TTT_inf(Game):
             age = position & mask_age
             token = (position & mask_token) >> 3
             if age == 0b001:
-                player = token
+                player = token ^ 0b1
                 break
             position >>= piece_shift
         return 'x' if player == 0 else 'o'
@@ -122,7 +124,7 @@ class TTT_inf(Game):
     
     @abstractmethod
     def from_string(stringpos: str) -> int:
-        arr = stringpos.split(',')
+        arr = stringpos.split('|')
         pos = 0
         for piece in arr:
             pos <<= 4

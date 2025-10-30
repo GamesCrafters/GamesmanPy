@@ -9,12 +9,19 @@ host, port = "127.0.0.1", 9004
 
 ERR_POS = -1
 
+def value_to_string(value: Value):
+    match value:
+        case Value.Win: return "win"
+        case Value.Tie: return "tie"
+        case Value.Loss: return "lose"
+
 @app.route('/<game_id>/<variant_id>/start/', methods=['GET'])
 def get_start_pos(game_id: str, variant_id: str):
-    game = get_game(game_id, variant_id)
-    match game:
-        case Ok(value): game = value
+    _game = get_game(game_id, variant_id)
+    match _game:
+        case Ok(value): _game = value
         case Err(error): abort(404, description=error)
+    game = _game(variant_id)
     pos = game.start()
     return {
         'position': game.to_string(pos, StringMode.Readable),
@@ -27,10 +34,11 @@ def get_pos(game_id: str, variant_id: str):
     if stringpos is None:
         abort(404, description="Empty position")
     game_res = get_game(game_id, variant_id)
-    game = None
+    _game = None
     match game_res:
-        case Ok(value): game = value
+        case Ok(value): _game = value
         case Err(error): abort(404, description=error)
+    game = _game(variant_id)
     pos = game.from_string(stringpos)
     db = GameDB(game_id, variant_id)
     entry = db.get(pos)
@@ -45,7 +53,7 @@ def get_pos(game_id: str, variant_id: str):
         move_objs.append({
             "position": game.to_string(new_pos, StringMode.Readable),
             "autoguiPosition": game.to_string(new_pos, StringMode.AUTOGUI),
-            "positionValue": child_val,
+            "positionValue": value_to_string(child_val),
             "move": game.move_to_string(move, StringMode.Readable),
             "autoguiMove": game.move_to_string(move, StringMode.AUTOGUI),
             "remoteness": child_rem,
@@ -53,7 +61,7 @@ def get_pos(game_id: str, variant_id: str):
     response = {
         'position': stringpos,
         'autoguiPosition': game.to_string(pos, StringMode.AUTOGUI),
-        'positionValue': val,
+        'positionValue': value_to_string(val),
         'remoteness': rem,
         'moves': move_objs,
     }
