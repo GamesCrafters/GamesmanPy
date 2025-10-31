@@ -13,6 +13,7 @@ def value_to_string(value: Value):
     match value:
         case Value.Win: return "win"
         case Value.Tie: return "tie"
+        case Value.Draw: return "draw"
         case Value.Loss: return "lose"
 
 @app.route('/<game_id>/<variant_id>/start/', methods=['GET'])

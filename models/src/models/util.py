@@ -7,8 +7,9 @@ E = TypeVar("E")
 
 class Value(IntEnum):
     Loss = 0
-    Tie = 1
-    Win = 2
+    Draw = 1
+    Tie = 2
+    Win = 3
 
 class StringMode(IntEnum):
     Readable = 0

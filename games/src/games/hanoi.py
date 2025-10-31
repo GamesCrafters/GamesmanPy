@@ -1,24 +1,24 @@
 from models import Game, Value, StringMode
 from typing import Optional
 
-class Example(Game):
-    id = 'example'
-    variants = ["a", "b", "c"]
-    n_players = 2
+class Hanoi(Game):
+    id = 'hanoi'
+    variants = ["regular"]
+    n_players = 1
     cyclic = False
 
     def __init__(self, variant_id: str):
         """
         Define instance variables here (i.e. variant information)
         """
-        if variant_id not in Example.variants:
+        if variant_id not in Hanoi.variants:
             raise ValueError("Variant not defined")
         self._variant_id = variant_id
         pass
 
     def start(self) -> int:
         """
-        Returns the starting position of the game.
+        Returns the starting position of the puzzle.
         """
         pass
     

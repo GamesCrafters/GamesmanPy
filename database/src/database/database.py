@@ -2,10 +2,10 @@ import sqlite3 as sql
 from pathlib import Path
 from typing import Optional
 import os
-from games import get_game
+from games import *
 
 class GameDB:
-    def __init__(self, id: str, variant: str):
+    def __init__(self, id: str, variant: str, ro: bool=True):
         game_res = get_game(id, variant)
         if game_res.is_err():
             raise ValueError(game_res.unwrap_err())
@@ -13,8 +13,14 @@ class GameDB:
         file_name = f'{id}_{variant}'
         self.path = f'{Path(__file__).resolve().parents[2]}/db/{file_name}.db'
         self.exists = os.path.exists(self.path)
-        self.db = sql.connect(self.path)
+        uri_path = self.path
+        if ro:
+            uri_path = f'file:{self.path}?immutable=1'
+        self.db = sql.connect(uri_path, uri=ro)
         self.cursor = self.db.cursor()
+
+    def __del__(self):
+        self.close()
 
     def create_table(self, overwrite=True):
         '''
@@ -27,7 +33,6 @@ class GameDB:
         '''
         if overwrite:
             self.cursor.execute('DROP TABLE IF EXISTS gamedb')
-            self.db.commit()
         self.cursor.execute(
             '''
             CREATE TABLE IF NOT EXISTS gamedb (
@@ -37,6 +42,7 @@ class GameDB:
             )
             '''
         )
+        self.db.commit()
     
     def insert(self, table: dict[int, tuple[int, int]]):
         '''
