@@ -2,8 +2,8 @@
 
 GamesmanPy is designed to be an entry point into the GamesCrafters game and puzzle
 solving systems. It can solve relatively small (~10 million positions) games and
-puzzles and has a server module which will serve the games to the GamesmanUni
-backend, GamesCraftersUWAPI.
+puzzles and has a server module that allows GamesmanPy to interface with
+[GamesCraftersUWAPI](https://github.com/GamesCrafters/GamesCraftersUWAPI).
 
 To install GamesmanPy, follow these steps:
 1. Clone the repository with `git clone git@github.com:GamesCrafters/GamesmanPy.git`
