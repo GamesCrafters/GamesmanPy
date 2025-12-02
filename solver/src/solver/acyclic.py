@@ -1,6 +1,6 @@
 from collections import deque
 from models import *
-from database import GameDB
+from database import DuckDB, SqliteDB
 import time
 
 REMOTENESS_TERMINAL = 0
@@ -21,9 +21,13 @@ class AcyclicSolver:
             variants = [variant]
 
         for variant in variants:
+            self.solution = {}
+            self.parent_map = {}
+            self.unsolved_children = {}
             self.game = self._game(variant)
-            self.db = GameDB(self._game.id, variant, ro=False)
+            self.db = SqliteDB(self._game.id, variant, ro=False)
             if overwrite or not self.db.exists:
+                print("----------------------------------")
                 print(f"Solving {self.game.id}, variant: {variant}")
                 print("Creating database file")
                 self.db.create_table(overwrite)
@@ -41,13 +45,14 @@ class AcyclicSolver:
                 print(f"Solved {self.game.id}, variant: {variant} in {elapsed:.2f}s")
                 print("Writing to database...")
                 self.db.insert(self.solution)
-                print(len(self.solution))
+                print(f'{len(self.solution)} positions written to database')
             else:
                 print(f"{self.game.id}, variant: {variant} already solved.")
 
     def get_children(self, position):
         moves = self.game.generate_moves(position)
-        return list(map(lambda m: self.game.do_move(position, m), moves))
+        children = list(map(lambda m: self.game.do_move(position, m), moves))
+        return children
 
     def discover(self):
         visited = set()

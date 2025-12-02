@@ -1,12 +1,24 @@
+from pathlib import Path
 from typing import Optional
+import os
+from .database import GameDB
+from games import get_game
+import indexed_gzip as igzip
+import gzip
 
-class GameDB:
+class ArrayDB(GameDB):
     def __init__(self, id: str, variant: str, ro: bool=True):
         '''
         Initialize the database for the given game id, variant id combination.
         Open as read only if ro=True
         '''
-        pass
+        game_res = get_game(id, variant)
+        if game_res.is_err():
+            raise ValueError(game_res.unwrap_err())
+
+        file_name = f'{id}_{variant}'
+        self.path = f'{Path(__file__).resolve().parents[2]}/db/{file_name}.db'
+        self.exists = os.path.exists(self.path)
 
     def __del__(self):
         '''

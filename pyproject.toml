@@ -7,6 +7,9 @@ requires-python = ">=3.12"
 dependencies = [
     "flask>=3.1.0",
     "waitress>=3.0.2",
+    "duckdb>=1.4.1",
+    "pandas>=2.3.3",
+    "indexed_gzip>=1.10.1",
     "database",
     "games",
     "interfaces",

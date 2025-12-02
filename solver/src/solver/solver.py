@@ -6,7 +6,7 @@ import argparse
 parser = argparse.ArgumentParser(description="GamesmanPy Solver cli")
 
 parser.add_argument("game_id", help="Game ID", nargs="?", default=None)
-parser.add_argument("-v", "--variant", type=str, default=None)
+parser.add_argument("-v", "--variant", help="Variant ID", type=str, default=None)
 parser.add_argument("-o", "--overwrite", action="store_true", help="Overwrite existing db?")
 args = parser.parse_args()
 
@@ -29,6 +29,7 @@ def main():
                 exit()
         s = AcyclicSolver(game)
         s.solve(overwrite=overwrite, variant=variant_id)
+        
 
 '''
 for game in game_list.values():

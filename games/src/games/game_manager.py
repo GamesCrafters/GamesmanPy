@@ -1,16 +1,15 @@
 from .ten_to_zero import TenToZero
 from .ttt_inf import TTT_inf
 from .clobber import Clobber
+from .horses import Horses
+from .pancakes import Pancakes
 from models import *
-
-"""
-"ten-to-zero": TenToZero,
-"ttt-inf": TTT_inf,
-"""
 
 game_list = {
     "ttt-inf": TTT_inf,
     "clobber": Clobber,
+    "horses": Horses,
+    "pancakes": Pancakes,
 }
 
 def validate(game_id: str, variant_id: str) -> bool:
