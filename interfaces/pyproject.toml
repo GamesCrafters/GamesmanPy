@@ -13,7 +13,7 @@ dependencies = []
 packages = ["src/interfaces"]
 
 [project.scripts]
-interfaces = "interfaces:main"
+interfaces = "interfaces.main:main"
 
 [build-system]
 requires = ["hatchling"]

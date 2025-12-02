@@ -1,33 +1,45 @@
-from solver import AcyclicSolver
-from database import GameDB
+from solver import Solver
+from database import SqliteDB
 from games import get_game, game_list
 from models import *
 from typing import Optional
 
 class TUI:
     def __init__(self):
-        (self.game, self.variant) = self.select_game()
+        (self._game, self.variant) = self.select_game()
+        self.game = self._game(self.variant)
         self.play(self.game, self.variant)
 
 
     def play(self, game: Game, variant: str):
-        db = GameDB(game.id, variant)
+        db = SqliteDB(game.id, variant)
         curr_pos = game.start()
         while game.primitive(curr_pos) is None:
             print("Current position:")
             self.print_position(game, curr_pos)
             moves = game.generate_moves(curr_pos)
-            curr_val = db.get(curr_pos)
-            print(f'Position is a {"win" if curr_val[1] == Value.Win else "lose"} in {curr_val[0]} moves.')
+            (curr_rem, curr_val) = db.get(curr_pos)
+            print(f'Position is a {"win" if curr_val == Value.Win else "lose"} in {curr_rem} moves.')
             moves_map = {self.get_move_string(game, move): move for move in moves}
             for move in moves_map.keys():
                 possible = game.do_move(curr_pos, moves_map[move])
-                val = db.get(possible)
-                print(f'{move}: {"Winning Move" if val[1] == Value.Loss else "Losing Move"} in {val[0]}')
+                (rem, val) = db.get(possible)
+                print(f'{move}: {"Winning Move" if self.get_move_value(val) == Value.Win else "Losing Move"} in {rem}')
             user_move = self.get_valid_move(moves_map.keys())
             curr_pos = game.do_move(curr_pos, moves_map[user_move])
         self.print_position(game, curr_pos)
         print("GAME OVER")
+
+    def get_move_value(self, child_val):
+        if self.game.n_players == 1:
+            return child_val
+        if child_val == Value.Loss:
+            return Value.Win
+        if child_val == Value.Tie:
+            return Value.Tie
+        if child_val == Value.Win:
+            return Value.Loss
+        return Value.Draw
 
     def print_position(self, game: Game, position: int):
         print(game.to_string(position, StringMode.Readable))

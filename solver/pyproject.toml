@@ -9,11 +9,8 @@ authors = [
 requires-python = ">=3.12"
 dependencies = []
 
-[tool.hatch.build.targets.wheel]
-packages = ["src/solver"]
-
 [project.scripts]
-solver = "solver:main"
+solver = "solver.main:main"
 
 [build-system]
 requires = ["hatchling"]

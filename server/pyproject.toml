@@ -13,7 +13,7 @@ dependencies = []
 packages = ["src/server"]
 
 [project.scripts]
-server = "server:main"
+server = "server.main:main"
 
 [build-system]
 requires = ["hatchling"]

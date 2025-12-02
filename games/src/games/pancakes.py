@@ -5,7 +5,7 @@ import math
 
 class Pancakes(Game):
     id = 'pancakes'
-    variants = ["5", "6", "7"]
+    variants = ["5", "6", "7", "8"]
     n_players = 1
     cyclic = True
 
@@ -17,6 +17,7 @@ class Pancakes(Game):
             raise ValueError("Variant not defined")
         self._variant_id = variant_id
         self.height = int(variant_id)
+        self.factorials = [math.factorial(n) for n in range(0, self.height + 1)]
 
     def start(self) -> int:
         """
@@ -100,7 +101,7 @@ class Pancakes(Game):
         n = self.height
         for i in range(n):
             count = self.count_lower(widths, i)
-            h += count * math.factorial(n - i - 1)
+            h += count * self.factorials[n - i - 1]
         direction_hash = 0
         for dir in directions:
             direction_hash <<= 1
@@ -117,7 +118,7 @@ class Pancakes(Game):
             direction_arr.append(position & 0b1)
             position >>= 1
         for i in range(n - 1, -1, -1):
-            f = math.factorial(i)
+            f = self.factorials[i]
             val = width_sorted.pop(position // f)
             width_arr.append(val)
             position = position % f

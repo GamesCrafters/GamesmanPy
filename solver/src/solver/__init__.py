@@ -1,2 +1,1 @@
-from .acyclic import AcyclicSolver
-from .solver import main
+from .solver import Solver
