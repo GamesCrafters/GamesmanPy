@@ -1,4 +1,4 @@
-#GamesmanPy
+# GamesmanPy
 
 GamesmanPy is designed to be an entry point into the GamesCrafters game and puzzle
 solving systems. It can solve relatively small (~10 million positions) games and
