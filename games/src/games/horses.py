@@ -3,7 +3,7 @@ from typing import Optional
 
 class Horses(Game):
     id = 'horses'
-    variants = ["regular"]
+    variants = ["regular", "misere"]
     n_players = 2
     cyclic = True
 
@@ -75,17 +75,20 @@ class Horses(Game):
         """
         (position_str, turn) = self.unhash(position)
         center = position_str[8]
+        ending_value = Value.Loss
+        if self._variant_id == "misere":
+            ending_value = Value.Win
         for i in range(4):
             start = position_str[i]
             end = position_str[(i + 4) % 8]
             if start == end and start == center and start != '-':
-                return Value.Loss
+                return ending_value
         for i in range(8):
             first = position_str[i]
             second = position_str[(i + 1) % 8]
             third = position_str[(i + 2) % 8]
             if first == second and first == third and first != '-':
-                return Value.Loss
+                return ending_value
         return None
 
     def to_string(self, position: int, mode: StringMode) -> str:
