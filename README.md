@@ -20,3 +20,19 @@ To run the server, use `uv run server`. This will start a local server on port 9
 
 To run the tui, use `uv run interfaces tui`. This will open up a text user interface
 where you can play the games in the system.
+
+To give an idea of the capabilities of GamesmanPy, here are some example solve
+times of various sized games.
+
+| Number of States | Solve Time |
+|------------------|------------|
+| 3,840            | 0.06s      |
+| 46,080           | 0.95s      |
+| 645,120          | 19.20s     |
+| 10,321,920       | 412.99s    |
+
+For games much larger than this, you may want to look into some of our more
+performant systems, like
+[GamesmanClassic](https://github.com/GamesCrafters/GamesmanClassic),
+[GamesmanOne](https://github.com/GamesCrafters/GamesmanOne), or
+[GamesmanNova](https://github.com/GamesCrafters/GamesmanNova).
