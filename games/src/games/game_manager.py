@@ -1,11 +1,13 @@
 from .clobber import Clobber
 from .horses import Horses
+from .lightsout import LightsOut
 from .pancakes import Pancakes
 from models import *
 
 game_list = {
     "clobber": Clobber,
     "horses": Horses,
+    "lightsout": LightsOut,
     "pancakes": Pancakes,
 }
 
