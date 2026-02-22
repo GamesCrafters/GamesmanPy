@@ -69,6 +69,9 @@ class Solver:
             else:
                 children = self.get_children(position)
                 self.unsolved_children[position] = len(children)
+                if not children and self.game.n_players == 1:
+                    self.solution[position] = (REMOTENESS_TERMINAL, Value.Loss)
+
                 for child in children:
                     if not self.parent_map.get(child):
                         self.parent_map[child] = set()
@@ -132,8 +135,13 @@ class Solver:
 
     def resolve_draws(self):
         for pos in self.unsolved_children.keys():
-            if self.unsolved_children[pos] > 0:
-                self.solution[pos] = (REMOTENESS_DRAW, Value.Draw)
+            if self.game.n_players == 2:
+                if self.unsolved_children[pos] > 0:
+                    self.solution[pos] = (REMOTENESS_DRAW, Value.Draw)
+            else:
+                if pos not in self.solution or self.unsolved_children[pos] > 0:
+                    self.solution[pos] = (REMOTENESS_DRAW, Value.Loss)
+            
     
     def parent_value(self, val: Value) -> Value:
         if self._game.n_players == 1:
