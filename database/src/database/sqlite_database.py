@@ -14,6 +14,11 @@ class SqliteDB(GameDB):
         file_name = f'{id}_{variant}'
         self.path = f'{Path(__file__).resolve().parents[2]}/db/{file_name}.db'
         self.exists = os.path.exists(self.path)
+        
+        # Create db directory if it doesn't exist and we're not in read-only mode
+        if not ro:
+            os.makedirs(os.path.dirname(self.path), exist_ok=True)
+        
         uri_path = self.path
         if ro:
             uri_path = f'file:{self.path}?immutable=1'
