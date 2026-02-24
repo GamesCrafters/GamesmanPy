@@ -1,8 +1,12 @@
 from .clobber import Clobber
 from .horses import Horses
 from .pancakes import Pancakes
+<<<<<<< HEAD
 from .chipschallenge import ChipsChallenge
 from .test import Test
+=======
+from .snakestale import Snakestale
+>>>>>>> 8e03bb5 (snakestale w5)
 from models import *
 
 game_list = {
