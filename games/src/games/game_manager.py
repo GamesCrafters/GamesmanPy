@@ -1,6 +1,7 @@
 from .clobber import Clobber
 from .horses import Horses
 from .pancakes import Pancakes
+from .snakestale import Snakestale
 from models import *
 
 game_list = {
