@@ -7,6 +7,7 @@ game_list = {
     "clobber": Clobber,
     "horses": Horses,
     "pancakes": Pancakes,
+    "lunar_lockout": LunarLockout,
 }
 
 def validate(game_id: str, variant_id: str) -> bool:
