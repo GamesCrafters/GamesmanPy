@@ -3,17 +3,20 @@ from typing import Optional
 
 class LunarLockout(Game):
     id = 'lunar_lockout'
-    variants = ["5x5"]
+    variants = ["puzzle1"]
+    board_size = ["5x5"]
     n_players = 1
     cyclic = True
-    _move_up = 0b00
-    _move_down = 0b10
-    _move_right = 0b01
-    _move_left = 0b11
+    
+    _move_up = 0
+    _move_down = 1
+    _move_right = 2
+    _move_left = 3
 
     # Store the variant and board dimensions (5x5).
     # Define constants: center square index (12), removed-robot value (31), and total robots (5).
     # Robot index 0 always represents the red robot.
+    # Each robot position is encoded using 5 bits (values 0–31), producing a 25-bit packed state.
     # Prepare any movement direction offsets needed for row/column stepping.
     def __init__(self, variant_id: str):
         """
@@ -22,9 +25,32 @@ class LunarLockout(Game):
         if variant_id not in LunarLockout.variants:
             raise ValueError("Variant not defined")
         self._variant_id = variant_id
-        self._cols = int(variant_id[0])
-        self._rows = int(variant_id[2])
-        self.board_size = [int(i) for i in self._variant_id.split(sep="x")]
+
+        size_string = LunarLockout.board_size[0]   # "5x5"
+        self._rows, self._cols = map(int, size_string.split("x"))
+        self._cells = self._rows * self._cols
+
+        # Exit Position
+        self._center = self._cells // 2
+
+        # Robot configs
+        self._robot_count = 5
+        self._red_index = 0
+
+        # Removed robots value
+        self._removed = 31
+
+        # Constants
+        self._bits_per_robot = 5
+        self._mask = 0b11111
+
+        # movement directions
+        self._directions = {
+            self._move_up:    (-1, 0),
+            self._move_down:  ( 1, 0),
+            self._move_left:  ( 0, -1),
+            self._move_right: ( 0, 1),
+        }
 
 
     # Select starting squares for all robots with no duplicates.
@@ -42,7 +68,7 @@ class LunarLockout(Game):
     # Skip robots marked as removed (31).
     # For each active robot, attempt movement in the four directions.
     # Movement must stay within the same row for left/right and same column for up/down.
-    # While scanning, consider only the nearest active robot as a blocker.
+    # While scanning, ignore removed robots and consider only the nearest active robot as a blocker.
     # Add a move for every direction; absence of a blocker means the robot will leave the board.
     # Encode moves as (robot_index * 4 + direction).
     def generate_moves(self, position: int) -> list[int]:
@@ -54,9 +80,10 @@ class LunarLockout(Game):
 
     # Decode the state and identify the robot and direction from the move.
     # If the chosen robot is already removed, return the original state.
-    # Slide in the chosen direction until the nearest blocking robot is found.
+    # Slide in the chosen direction while staying aligned to the same row or column.
+    # Stop when the nearest blocking robot is found.
     # If a blocker exists, stop immediately before it.
-    # If no blocker exists, mark the robot as removed (31).
+    # If the scan reaches the board edge with no blocker, the robot leaves the board and is marked removed (31).
     # Do not allow two active robots to occupy the same square.
     # Re-encode the updated positions into the new state.
     def do_move(self, position: int, move: int) -> int:
@@ -110,6 +137,7 @@ class LunarLockout(Game):
     
     # Helper responsibilities:
     # Provide pack and unpack functions converting between the integer state and the five robot positions.
+    # Pack and unpack must be exact inverses and produce a single canonical representation of every board state.
     # Convert between index and (row, column) coordinates.
     # Provide stepping logic for movement along rows and columns.
     # Provide alignment checks for same-row and same-column detection.
