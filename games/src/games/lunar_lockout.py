@@ -7,7 +7,7 @@ class LunarLockout(Game):
     board_size = ["5x5"]
     n_players = 1
     cyclic = True
-    
+
     _move_up = 0
     _move_down = 1
     _move_right = 2
@@ -26,9 +26,14 @@ class LunarLockout(Game):
             raise ValueError("Variant not defined")
         self._variant_id = variant_id
 
-        size_string = LunarLockout.board_size[0]   # "5x5"
+        # Board dimensions
+        size_string = LunarLockout.board_size[0]
         self._rows, self._cols = map(int, size_string.split("x"))
         self._cells = self._rows * self._cols
+        # Limits
+        self._max_row = self._rows - 1
+        self._max_col = self._cols - 1
+        self.row_stride = self._cols
 
         # Exit Position
         self._center = self._cells // 2
@@ -36,15 +41,13 @@ class LunarLockout(Game):
         # Robot configs
         self._robot_count = 5
         self._red_index = 0
-
-        # Removed robots value
         self._removed = 31
 
-        # Constants
+        # Encoding
         self._bits_per_robot = 5
         self._mask = 0b11111
 
-        # movement directions
+        # Directions
         self._directions = {
             self._move_up:    (-1, 0),
             self._move_down:  ( 1, 0),
@@ -141,3 +144,46 @@ class LunarLockout(Game):
     # Convert between index and (row, column) coordinates.
     # Provide stepping logic for movement along rows and columns.
     # Provide alignment checks for same-row and same-column detection.
+
+
+    def pack(self, robots: list[int]) -> int:
+        '''
+        Converts a list of robot positions into a single integer state.
+
+        robots is a list of length 5 in the fixed order:
+        [red, helper1, helper2, helper3, helper4]
+
+        Each position is stored using 5 bits (values 0-31).
+        0-24 represent board squares and 31 represents a removed robot.
+        '''
+        state = 0
+        # Insert each robot position into the integer from left to right.
+        # Shift the existing bits 5 places and place the new position
+        # into the lowest 5 bits.
+        for position in robots:
+            if position < 0 or position > self._mask:
+                raise ValueError("Invalid robot position")
+
+            state = (state << self._bits_per_robot) | position
+
+        return state
+    
+    def unpack(self, state: int) -> list[int]:
+        """
+        Converts an encoded integer state back into robot positions.
+
+        Returns a list of length 5 in the order:
+        [red, helper1, helper2, helper3, helper4]
+
+        The function repeatedly reads the lowest 5 bits to recover
+        each robot position and shifts the state right after each read.
+        """
+        robots = [0] * self._robot_count
+
+        # Extract robots in reverse order because the last robot was
+        # stored in the lowest 5 bits.
+        for i in range(self._robot_count - 1, -1, -1):
+            robots[i] = state & self._mask  # read last 5 bits
+            state >>= self._bits_per_robot  # remove those 5 bits
+
+        return robots
