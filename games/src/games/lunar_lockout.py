@@ -44,7 +44,6 @@ class LunarLockout(Game):
         # Encoding
         self._bits_per_robot = 5
         self._mask = 0b11111
-
         # Directions
         self._directions = {
             self._move_up:    (-1, 0),
@@ -67,17 +66,35 @@ class LunarLockout(Game):
 
     # Decode the state into robot positions.
     # Skip robots marked as removed (31).
-    # For each active robot, attempt movement in the four directions.
-    # Movement must stay within the same row for left/right and same column for up/down.
-    # While scanning, ignore removed robots and consider only the nearest active robot as a blocker.
-    # Add a move for every direction; absence of a blocker means the robot will leave the board.
+    # Each remaining robot can be pushed in four directions (UP, RIGHT, DOWN, LEFT).
     # Encode moves as (robot_index * 4 + direction).
     def generate_moves(self, position: int) -> list[int]:
         """
         Returns a list of positions given the input position.
+        A move is encoded as:
+        move = robot_index * 4 + direction
+        Directions:
+            0 = UP
+            1 = RIGHT
+            2 = DOWN
+            3 = LEFT
+        Move:
+            robot index 0 = 0-3
+                        1 = 4-7
+                        ....
         """
-        pass
-    
+        robots = self.unpack(position)
+        moves = []
+        for robot_index in range(self._robot_count):
+            # Skip robots that have been removed
+            if robots[robot_index] == self._removed:
+                continue
+            # Each active robot can attempt all four directions
+            for direction in range(4):
+                move = robot_index * 4 + direction
+                moves.append(move)
+        return moves
+
 
     # Decode the state and identify the robot and direction from the move.
     # If the chosen robot is already removed, return the original state.
@@ -91,7 +108,50 @@ class LunarLockout(Game):
         """
         Returns the resulting position of applying move to position.
         """
-        pass
+        robot_positions = self.unpack(position)
+        # Get new robot position and direction
+        robot_index = move // 4 # 7/4 = index 1
+        direction = move % 4    # 7%4 = direction 3
+
+        # Handle removed robot
+        if robot_positions[robot_index] == self._removed:
+            return position
+        
+        # Current Robot position
+        cell = robot_positions[robot_index]
+        row = cell // self._cols
+        col = cell % self._cols
+        # Move Direction Step
+        move_row, move_col = self._directions[direction] # Gives step by step movements
+
+        # Move Robots
+        while True:
+            next_row = row + move_row
+            next_col = col + move_col
+
+            # Handle robot getting out of space
+            if not (0 <= next_row < self._rows and 0 <= next_col < self._cols):
+                robot_positions[robot_index] = self._removed
+                break
+
+            next_cell = next_row * self._cols + next_col
+
+            # Move robot until block
+            blocked = False
+            for i in range(self._robot_count):
+                if i != robot_index and robot_positions[i] == next_cell:
+                    blocked = True
+                    break
+            if blocked:
+                break
+
+            row = next_row
+            col = next_col
+
+        if robot_positions[robot_index] != self._removed:
+            robot_positions[robot_index] = row * self._cols + col
+
+        return self.pack(robot_positions)
 
 
     # Decode the state.
@@ -187,5 +247,4 @@ class LunarLockout(Game):
         for i in range(self._robot_count - 1, -1, -1):
             robots[i] = state & self._mask  # get last 5 bits
             state >>= self._bits_per_robot  # discard those bits
-
         return robots
