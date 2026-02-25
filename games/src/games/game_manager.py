@@ -1,12 +1,15 @@
 from .clobber import Clobber
 from .horses import Horses
 from .pancakes import Pancakes
+from .hashi import Hashi
+
 from models import *
 
 game_list = {
     "clobber": Clobber,
     "horses": Horses,
     "pancakes": Pancakes,
+    "hashi": Hashi
 }
 
 def validate(game_id: str, variant_id: str) -> bool:
