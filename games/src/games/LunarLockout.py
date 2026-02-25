@@ -62,20 +62,16 @@ class LunarLockout(Game):
         Returns the starting position of the game.
         """
 
-        # # All values must be 0–24 and no duplicates.
-        # red = 0
-        # r1 = 4
-        # r2 = 20
-        # r3 = 24
-        # r4 = 12
-        # robots = [red, r1, r2, r3, r4]
-        # return self.pack(robots)
+        # All values must be 0–24 and no duplicates.
         red = 0
-        helpers = [6, 8, 16, 18]
+        r1 = 6
+        r2 = 8
+        r3 = 16
+        r4 = 18
+        robots = [red, r1, r2, r3, r4]
         if red == 12:
             raise ValueError("Red cannot start at exit")
-
-        return self.pack([red] + helpers)
+        return self.pack(robots)
     
 
     # Decode the state into robot positions.
@@ -176,7 +172,17 @@ class LunarLockout(Game):
         """
         Returns a Value enum which defines whether the current position is a win, loss, or non-terminal. 
         """
-        pass
+        robot_positions = self.unpack(position)
+        red_position = robot_positions[self._red_index]
+
+        # reach the goal?
+        if red_position == self._center:
+            return Value.Win
+        
+        if red_position == self._removed:
+            return Value.Loss
+        
+        return None
 
 
     # Convert the encoded state into a readable 5x5 board.
@@ -186,7 +192,7 @@ class LunarLockout(Game):
         """
         Returns a string representation of the position based on the given mode.
         """
-        robots = unpack(position)
+        robots = self.unpack(position)
 
         board = [["." for _ in range(5)] for _ in range(5)]
         board[2][2] = "X"       
