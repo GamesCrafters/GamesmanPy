@@ -61,7 +61,14 @@ class LunarLockout(Game):
         """
         Returns the starting position of the game.
         """
-        pass
+        # All values must be 0–24 and no duplicates.
+        red = 0
+        r1 = 4
+        r2 = 20
+        r3 = 24
+        r4 = 12
+        robots = [red, r1, r2, r3, r4]
+        return self.pack(robots)
     
 
     # Decode the state into robot positions.

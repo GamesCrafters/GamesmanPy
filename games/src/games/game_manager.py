@@ -2,6 +2,7 @@ from .clobber import Clobber
 from .horses import Horses
 from .pancakes import Pancakes
 from models import *
+from .LunarLockout import LunarLockout
 
 game_list = {
     "clobber": Clobber,
