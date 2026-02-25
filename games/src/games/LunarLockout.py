@@ -61,13 +61,12 @@ class LunarLockout(Game):
         """
         Returns the starting position of the game.
         """
-
         # All values must be 0–24 and no duplicates.
-        red = 0
-        r1 = 6
-        r2 = 8
-        r3 = 16
-        r4 = 18
+        red = 7
+        r1 = 11
+        r2 = 13
+        r3 = 17
+        r4 = 22
         robots = [red, r1, r2, r3, r4]
         if red == 12:
             raise ValueError("Red cannot start at exit")
@@ -280,7 +279,6 @@ class LunarLockout(Game):
         for position in robots:
             if position < 0 or position > self._mask:
                 raise ValueError("Invalid robot position")
-
             state = (state << self._bits_per_robot) | position
         return state
 
