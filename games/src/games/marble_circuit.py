@@ -1,63 +1,66 @@
 from models import Game, Value, StringMode
 from typing import Optional
 
-# 每块有四个口（不是四条边）：左上=0, 右上=1, 右下=2, 左下=3
+# 口 0..3 = TL, TR, BR, BL
 TOP_LEFT, TOP_RIGHT, BOTTOM_RIGHT, BOTTOM_LEFT = 0, 1, 2, 3
 
-# 块类型：通道是「从哪个口进、从哪个口出」。实物规则：不可旋转。
-# ---------- 实物 4 种块（四个口：左上/右上/右下/左下）----------
-# 青绿菱形 )( ：左上↔左下、右上↔右下
+# 四种块路径 (in, out)，不可旋转
 TEAL_DIAMOND_PATHS = [(TOP_LEFT, BOTTOM_LEFT), (BOTTOM_LEFT, TOP_LEFT), (TOP_RIGHT, BOTTOM_RIGHT), (BOTTOM_RIGHT, TOP_RIGHT)]
-# 橘 T：左上、右上 都通 右下（左下堵）
 ORANGE_T_PATHS = [(TOP_LEFT, BOTTOM_RIGHT), (BOTTOM_RIGHT, TOP_LEFT), (TOP_RIGHT, BOTTOM_RIGHT), (BOTTOM_RIGHT, TOP_RIGHT)]
-# 黄 T：左上、右上 都通 左下（右下堵）
 YELLOW_T_PATHS = [(TOP_LEFT, BOTTOM_LEFT), (BOTTOM_LEFT, TOP_LEFT), (TOP_RIGHT, BOTTOM_LEFT), (BOTTOM_LEFT, TOP_RIGHT)]
-# 玫红四通：四个口互通
-# 玫红：惯性只走两条对角线——左上↔右下、右上↔左下
 MAGENTA_4WAY_PATHS = [(TOP_LEFT, BOTTOM_RIGHT), (BOTTOM_RIGHT, TOP_LEFT), (TOP_RIGHT, BOTTOM_LEFT), (BOTTOM_LEFT, TOP_RIGHT)]
 
-# ---------- 2x2 小 demo 用（仍用 0,1,2,3 当「边」用，仅 demo）----------
-# 直条/L 形用 0=上 1=右 2=下 3=左 的旧约定
+# 2x2 demo：边 0..3 = 上/右/下/左
 TOP, RIGHT, BOTTOM, LEFT = 0, 1, 2, 3
 STRAIGHT_PATHS = [(0, 2), (2, 0)]
 L_PATHS = [(0, 1), (1, 0)]
 
 
 def rotate_side(side: int, rotation: int) -> int:
-    """旋转后的边：rotation 为 0,1,2,3 表示 0°,90°,180°,270°。"""
     return (side + rotation) % 4
 
 
 def rotate_paths(paths: list[tuple[int, int]], rotation: int) -> list[tuple[int, int]]:
-    """把路径列表按 rotation 旋转。"""
     return [(
         rotate_side(a, rotation),
         rotate_side(b, rotation),
     ) for a, b in paths]
 
 
-# 10 位置金字塔拓扑（四口：0=左上 1=右上 2=右下 3=左下）。板子平的、无物理接线；
-# 「连接」= 块上的路径（球从哪个口出）+ 摆放位置的几何相邻（谁的口对谁的口、或对出口）。
-# 即：只有块摆放的位置，谁连谁由「金字塔几何」决定（谁与谁相邻、哪口对哪口），球路由块类型决定。
-# 布局：第1排(0)、第2排(1,2)、第3排(3,4,5)、第4排(6,7,8,9)。底排无横向，仅从上方进、从 BL/BR 到 5 个目标。
-# topology[位置][口] = (邻居位置, 邻居口) 或 ('exit', 目标编号)，入口由 ENTRY_START_CH23 指定。
+# 金字塔 10 格：口 0..3 = TL/TR/BR/BL。topology[slot][port] = (邻居slot, 邻居口) 或 ('exit', 目标0..4)。
+# 布局 0 / 1,2 / 3,4,5 / 6,7,8,9；底排无横向，BL/BR 为出口。
 PYRAMID_10_TOPOLOGY_CORNERS: list[list[tuple[int, int] | tuple[str, int] | None]] = [
-    [None, None, (2, TOP_LEFT), (1, TOP_RIGHT)],                           # 0: 顶槽；BL→1-TR（0→1→…→8）, BR→2-TL
-    [(0, BOTTOM_LEFT), (0, BOTTOM_RIGHT), (4, TOP_LEFT), (3, TOP_RIGHT)],   # 1: BR→4-TL（4、5号球 0→1→4→8，不经槽2）
-    [(1, BOTTOM_RIGHT), (5, TOP_LEFT), (5, TOP_LEFT), (4, TOP_RIGHT)],      # 2: BR→5-TL, BL→4-TR（金字塔：2 下左邻 4、下右邻 5；6号球 2→4→7→目标3）
-    [(1, BOTTOM_LEFT), (1, BOTTOM_RIGHT), (7, TOP_LEFT), (6, TOP_RIGHT)],   # 3: BL→6-TR（3号球 1→3→6 从6BR进目标2）, BR→7-TL
-    [(1, BOTTOM_RIGHT), (2, BOTTOM_LEFT), (8, TOP_LEFT), (7, TOP_RIGHT)],   # 4: TL←1-BR, TR↔2-BL（金字塔：4 上右邻 2）, BL→7-TR, BR→8-TL
-    [(2, BOTTOM_RIGHT), (2, BOTTOM_LEFT), (9, TOP_LEFT), (8, TOP_RIGHT)],   # 5: TL←2-BR, TR←2-BL, BR→9-TL, BL→8-TR（金字塔：5 下左邻 8、下右邻 9；7号球 5→8→目标4）
-    # 底排：仅从上方接收、仅从 BL/BR 出口；无 6↔7↔8↔9 横向（重力向下）
-    [(3, BOTTOM_LEFT), (3, BOTTOM_LEFT), ("exit", 1), ("exit", 0)],         # 6: TL 入口/←3-BL, TR←3-BL（3号球 3TR→6TR→6BR→目标2）, BR→目标2, BL→目标1
-    [(3, BOTTOM_RIGHT), (4, BOTTOM_LEFT), ("exit", 2), ("exit", 1)],        # 7: TL←3-BR, TR←4-BL（金字塔：7 上右邻 4）, BR→目标3, BL→目标2
-    [(4, BOTTOM_RIGHT), (5, BOTTOM_LEFT), ("exit", 3), ("exit", 2)],       # 8: TL←4-BR, TR←5-BL（7号球由此从8右下进目标4）, BR→目标4, BL→目标3
-    [(5, BOTTOM_RIGHT), None, ("exit", 4), ("exit", 3)],                    # 9: TL←5-BR, TR 为入口, BR→目标5, BL→目标4
+    [None, None, (2, TOP_LEFT), (1, TOP_RIGHT)],
+    [(0, BOTTOM_LEFT), (0, BOTTOM_RIGHT), (4, TOP_LEFT), (3, TOP_RIGHT)],
+    [(1, BOTTOM_RIGHT), (5, TOP_LEFT), (5, TOP_LEFT), (4, TOP_RIGHT)],
+    [(1, BOTTOM_LEFT), (1, BOTTOM_RIGHT), (7, TOP_LEFT), (6, TOP_RIGHT)],
+    [(1, BOTTOM_RIGHT), (2, BOTTOM_LEFT), (8, TOP_LEFT), (7, TOP_RIGHT)],
+    [(2, BOTTOM_RIGHT), (2, BOTTOM_LEFT), (9, TOP_LEFT), (8, TOP_RIGHT)],
+    [(3, BOTTOM_LEFT), (3, BOTTOM_LEFT), ("exit", 1), ("exit", 0)],
+    [(3, BOTTOM_RIGHT), (4, BOTTOM_LEFT), ("exit", 2), ("exit", 1)],
+    [(4, BOTTOM_RIGHT), (5, BOTTOM_LEFT), ("exit", 3), ("exit", 2)],
+    [(5, BOTTOM_RIGHT), None, ("exit", 4), ("exit", 3)],
 ]
-# 8 个小球入口：槽6左上、槽3左上、槽1左上、槽0左上、槽0右上、槽2右上、槽5右上、槽9右上
-ENTRY_START_CH23 = [(6, TOP_LEFT), (3, TOP_LEFT), (1, TOP_LEFT), (0, TOP_LEFT), (0, TOP_RIGHT), (2, TOP_RIGHT), (5, TOP_RIGHT), (9, TOP_RIGHT)]
+ENTRY_START_PYRAMID = [(6, TOP_LEFT), (3, TOP_LEFT), (1, TOP_LEFT), (0, TOP_LEFT), (0, TOP_RIGHT), (2, TOP_RIGHT), (5, TOP_RIGHT), (9, TOP_RIGHT)]
 
-# 2x2 demo 仍用「边」拓扑（上/右/下/左）
+# 块类型 1=T 2=O 3=Y 4=M。fixed_slots 不可 remove。
+PYRAMID_CHALLENGES: dict[str, dict] = {
+    "ch23": {
+        "fixed_slots": (0, 1, 4, 7, 9),
+        "init_board": [3, 1, 0, 0, 4, 0, 0, 2, 0, 3],
+        "init_rem": (2, 1, 0, 2),
+        "exit_counts": [0, 1, 4, 3, 0],
+        "solution_board": [3, 1, 1, 2, 4, 4, 4, 2, 1, 3],
+    },
+    "ch46": {
+        "fixed_slots": (3, 4, 5),
+        "init_board": [0, 0, 0, 1, 4, 4, 0, 0, 0, 0],
+        "init_rem": (2, 2, 2, 1),
+        "exit_counts": [1, 2, 2, 2, 1],
+        "solution_board": [2, 2, 4, 1, 4, 4, 1, 3, 3, 1],
+    },
+}
+
 PYRAMID_10_TOPOLOGY: list[list[tuple[int, int] | tuple[str, int] | None]] = [
     [("entry", 0), (2, TOP), (1, TOP), None],
     [(0, BOTTOM), (2, LEFT), (3, TOP), None],
@@ -73,11 +76,9 @@ PYRAMID_10_TOPOLOGY: list[list[tuple[int, int] | tuple[str, int] | None]] = [
 
 
 class MarbleCircuit(Game):
-    """
-    支持 2x2_ch1（4 槽可旋转）与 ch23（10 槽金字塔、4 种块不可旋转、按出口个数判胜）。
-    """
+    """2x2_ch1：4 槽可旋转。ch23/ch46/…：10 槽金字塔、4 种块不可旋转、按出口计数判胜。"""
     id = "marble_circuit"
-    variants = ["2x2_ch1", "ch23"]
+    variants = ["2x2_ch1", "ch23", "ch46"]
     n_players = 1
     cyclic = True
 
@@ -91,27 +92,17 @@ class MarbleCircuit(Game):
     GOALS_CH1 = [(0, 0), (1, 1)]
     INIT_REM_CH1 = (1, 0)
 
-    # ch23：固定块在槽 0,1,4,7,9（玩家不能 remove）；槽 2,3,5,6,8 由用户摆放、可 remove。
-    # 拓扑随块摆放由 _get_topology_ch23(board) 计算，球路据此 + 块类型。
-    # 块类型 1=青绿 2=橘 3=黄 4=玫红。固定：0=黄,1=青绿,4=玫红,7=橘,9=黄。
-    # Solver：支持「放置」与「移除」两种操作；remoteness = 到终局的最少步数（每步放或拿都算 1 步）。
-    INIT_BOARD_CH23 = [3, 1, 0, 0, 4, 0, 0, 2, 0, 3]  # 0-based；0,1,4,7,9 已摆，2,3,5,6,8 空待填
-    FIXED_SLOTS_CH23 = (0, 1, 4, 7, 9)  # 固定块位置，玩家不能 remove
-    INIT_REM_CH23 = (2, 1, 0, 2)  # 青绿、橘、黄、玫红 剩余
-    EXIT_COUNTS_CH23 = [0, 1, 4, 3, 0]  # 5 个出口各要几颗球
-    # 答案（1～10 号槽）：黄绿绿橘玫红玫红玫红橘绿黄 → 全填满后的板子
-    SOLUTION_BOARD_CH23 = [3, 1, 1, 2, 4, 4, 4, 2, 1, 3]  # 0-based: 黄青绿青绿橘玫红玫红玫红橘青绿黄
-
     def __init__(self, variant_id: str):
         if variant_id not in MarbleCircuit.variants:
             raise ValueError("Variant not defined")
         self._variant_id = variant_id
-        self._is_ch23 = variant_id == "ch23"
-        if self._is_ch23:
+        self._is_pyramid = variant_id in PYRAMID_CHALLENGES
+        self._ch_config = PYRAMID_CHALLENGES.get(variant_id)
+        if self._is_pyramid:
             self.NUM_SLOTS = 10
-            self.BOARD_TOPOLOGY = PYRAMID_10_TOPOLOGY_CORNERS  # 四个口（角）拓扑
+            self.BOARD_TOPOLOGY = PYRAMID_10_TOPOLOGY_CORNERS
             self._board_max = 5 ** 10
-            self._rem_max = 4 * 4 * 4 * 4  # 4 种块各 0..3
+            self._rem_max = 4 * 4 * 4 * 4
         else:
             self.NUM_SLOTS = 4
             self.BOARD_TOPOLOGY = MarbleCircuit.BOARD_TOPOLOGY_2X2
@@ -121,7 +112,7 @@ class MarbleCircuit(Game):
             self._board_max = self._base ** self.NUM_SLOTS
 
     def _decode(self, position: int):
-        if self._is_ch23:
+        if self._is_pyramid:
             return self._decode_ch23(position)
         board_enc = position % self._board_max
         rem_enc = position // self._board_max
@@ -149,7 +140,7 @@ class MarbleCircuit(Game):
         return board, (teal, orange, yellow, magenta)
 
     def _encode(self, board, rem_s, rem_L=None) -> int:
-        if self._is_ch23:
+        if self._is_pyramid:
             return self._encode_ch23(board, rem_s)
         rem_enc = rem_s + 2 * (rem_L or 0)
         board_enc = 0
@@ -164,7 +155,7 @@ class MarbleCircuit(Game):
         return board_enc + self._board_max * rem_enc
 
     def _get_block_paths(self, cell: int) -> list[tuple[int, int]]:
-        if self._is_ch23:
+        if self._is_pyramid:
             return self._get_block_paths_10(cell)
         if cell == 0:
             return []
@@ -186,14 +177,12 @@ class MarbleCircuit(Game):
         return []
 
     def _get_topology_ch23(self, board: list[int]) -> list[list[tuple[int, int] | tuple[str, int] | None]]:
-        """ch23：返回当前局对应的拓扑。板子无接线，连接 = 块上路径 + 位置几何相邻。
-        谁的口连到谁的口（或出口）由金字塔摆放几何唯一确定；球从哪口进、从哪口出由各位置上的块类型决定。
-        此处返回几何拓扑表（与摆放位置对应），不随 board 内容改变；若以后需「空位时连接不同」等规则可在此扩展。"""
+        """返回金字塔几何拓扑，当前实现与 board 无关。"""
         return PYRAMID_10_TOPOLOGY_CORNERS
 
     def _simulate_marble(self, board: list[int], start_entry: int) -> Optional[int]:
-        if self._is_ch23:
-            slot, side = ENTRY_START_CH23[start_entry]
+        if self._is_pyramid:
+            slot, side = ENTRY_START_PYRAMID[start_entry]
             topo = self._get_topology_ch23(board)
         else:
             slot, side = (0, TOP) if start_entry == 0 else (1, TOP)
@@ -218,15 +207,15 @@ class MarbleCircuit(Game):
             if isinstance(conn[0], str):
                 if conn[0] == "exit":
                     return conn[1]
-                return None  # 不应从块走回 entry
+                return None
             slot, side = conn
 
     def _simulate_marble_with_path(self, board: list[int], start_entry: int) -> tuple[Optional[int], list[tuple[int, int]]]:
-        """ch23：模拟一颗球，返回 (出口id或None, 路径 [(slot, port), ...])。"""
-        if not self._is_ch23:
+        """返回 (出口id或None, 路径 [(slot, port), ...])。"""
+        if not self._is_pyramid:
             ex = self._simulate_marble(board, start_entry)
             return (ex, [(0, 0)] if ex is not None else [])
-        slot, side = ENTRY_START_CH23[start_entry]
+        slot, side = ENTRY_START_PYRAMID[start_entry]
         topo = self._get_topology_ch23(board)
         path: list[tuple[int, int]] = [(slot, side)]
         visited = set()
@@ -254,7 +243,7 @@ class MarbleCircuit(Game):
             path.append((slot, side))
 
     def _trace_all_balls_ch23(self, board: list[int]) -> list[tuple[int, Optional[int], list[tuple[int, int]]]]:
-        """ch23：返回 [(球号1-8, 出口id或None, 路径), ...]。"""
+        """[(球号1-8, 出口或None, 路径), ...]。"""
         return [
             (i + 1, ex, path)
             for i in range(8)
@@ -262,7 +251,7 @@ class MarbleCircuit(Game):
         ]
 
     def _get_exit_counts_ch23(self, board: list[int]) -> list[int]:
-        """ch23：模拟 8 颗球，返回 5 个出口各自进球数。"""
+        """8 球模拟，返回 5 个出口计数。"""
         counts = [0] * 5
         for entry_id in range(8):
             ex = self._simulate_marble(board, entry_id)
@@ -271,37 +260,37 @@ class MarbleCircuit(Game):
         return counts
 
     def _all_goals_met(self, board: list[int]) -> bool:
-        if self._is_ch23:
-            return self._get_exit_counts_ch23(board) == list(MarbleCircuit.EXIT_COUNTS_CH23)
+        if self._is_pyramid:
+            return self._get_exit_counts_ch23(board) == list(self._ch_config["exit_counts"])
         for entry_id, exit_id in self._goals:
             if self._simulate_marble(board, entry_id) != exit_id:
                 return False
         return True
 
     def start(self) -> int:
-        if self._is_ch23:
-            return self._encode_ch23(list(MarbleCircuit.INIT_BOARD_CH23), MarbleCircuit.INIT_REM_CH23)
+        if self._is_pyramid:
+            cfg = self._ch_config
+            return self._encode_ch23(list(cfg["init_board"]), cfg["init_rem"])
         return self._encode([0] * self.NUM_SLOTS, self._init_rem[0], self._init_rem[1])
 
-    # ch23：放置 move 0..39 = slot*4+(btype-1)；移除 move 40..49 = 40+slot
-    CH23_REMOVE_MOVE_BASE = 40
+    PYRAMID_REMOVE_MOVE_BASE = 40  # place 0..39, remove 40+slot
 
     def generate_moves(self, position: int) -> list[int]:
-        if self._is_ch23:
+        if self._is_pyramid:
             board, (teal, orange, yellow, magenta) = self._decode_ch23(position)
             moves = []
             rem_all_zero = (teal == 0 and orange == 0 and yellow == 0 and magenta == 0)
             board_full = all(board[slot] != 0 for slot in range(10))
             if board_full and rem_all_zero:
-                return []  # 终局：不再允许 remove，由 primitive 判胜负
+                return []
             for slot in range(10):
                 if board[slot] == 0:
                     rem = [(1, teal), (2, orange), (3, yellow), (4, magenta)]
                     for btype, cnt in rem:
                         if cnt > 0:
-                            moves.append(slot * 4 + (btype - 1))  # place
-                elif slot not in MarbleCircuit.FIXED_SLOTS_CH23:
-                    moves.append(self.CH23_REMOVE_MOVE_BASE + slot)  # remove（仅非固定槽）
+                            moves.append(slot * 4 + (btype - 1))
+                elif slot not in self._ch_config["fixed_slots"]:
+                    moves.append(self.PYRAMID_REMOVE_MOVE_BASE + slot)
             return moves
         board, rem_s, rem_L = self._decode(position)
         moves = []
@@ -317,12 +306,12 @@ class MarbleCircuit(Game):
         return moves
 
     def do_move(self, position: int, move: int) -> int:
-        if self._is_ch23:
+        if self._is_pyramid:
             board, rem = self._decode_ch23(position)
             teal, orange, yellow, magenta = rem
-            if move >= self.CH23_REMOVE_MOVE_BASE:
-                slot = move - self.CH23_REMOVE_MOVE_BASE
-                if slot in MarbleCircuit.FIXED_SLOTS_CH23:
+            if move >= self.PYRAMID_REMOVE_MOVE_BASE:
+                slot = move - self.PYRAMID_REMOVE_MOVE_BASE
+                if slot in self._ch_config["fixed_slots"]:
                     raise ValueError("Cannot remove from fixed slot")
                 btype = board[slot]
                 board = list(board)
@@ -337,7 +326,7 @@ class MarbleCircuit(Game):
                     magenta += 1
                 return self._encode_ch23(board, (teal, orange, yellow, magenta))
             slot = move // 4
-            btype = (move % 4) + 1  # 1..4
+            btype = (move % 4) + 1
             board = list(board)
             board[slot] = btype
             if btype == 1:
@@ -363,24 +352,27 @@ class MarbleCircuit(Game):
         return self._encode(board, rem_s, rem_L)
 
     def primitive(self, position: int) -> Optional[Value]:
-        if self._is_ch23:
+        if self._is_pyramid:
             board, rem = self._decode_ch23(position)
             if any(r > 0 for r in rem):
                 return None
             return Value.Win if self._all_goals_met(board) else Value.Loss
+        board, rem_s, rem_L = self._decode(position)
+        if rem_s > 0 or rem_L > 0:
+            return None
+        return Value.Win if self._all_goals_met(board) else Value.Loss
 
     def get_exit_counts_display(self, position: int) -> Optional[str]:
-        """ch23: at game end return a line with your exit counts, goal, and success/fail. None if not ch23 or not terminal."""
-        if not self._is_ch23:
+        """终局时返回出口计数与目标对比；非金字塔或未终局返回 None。"""
+        if not self._is_pyramid:
             return None
         board, rem = self._decode_ch23(position)
         if any(r > 0 for r in rem):
             return None
         counts = self._get_exit_counts_ch23(board)
-        goal = list(MarbleCircuit.EXIT_COUNTS_CH23)
+        goal = list(self._ch_config["exit_counts"])
         if counts == goal:
             return f"Your exit counts: {counts}, goal: {goal}, success!"
-        # 失败时打印每颗球的路径，便于核对
         port_name = ("TL", "TR", "BR", "BL")
         lines = [f"Your exit counts: {counts}, goal: {goal}, failed."]
         for ball_id, ex, path in self._trace_all_balls_ch23(board):
@@ -390,7 +382,7 @@ class MarbleCircuit(Game):
         return "\n".join(lines)
 
     def to_string(self, position: int, mode: StringMode) -> str:
-        if self._is_ch23:
+        if self._is_pyramid:
             board, rem = self._decode_ch23(position)
             s = " ".join(str(b) for b in board) + " | T%d O%d Y%d M%d" % rem
             if mode == StringMode.AUTOGUI:
@@ -407,14 +399,14 @@ class MarbleCircuit(Game):
         s = strposition.strip()
         if s.startswith("0_"):
             s = s[2:]
-        if self._is_ch23:
+        if self._is_pyramid:
             parts = s.split("_")
             if len(parts) >= 5 and len(parts[0]) >= 10:
                 board = [int(c) for c in parts[0][:10]]
                 rem = tuple(int(parts[i]) for i in range(1, 5))
             else:
-                board = list(MarbleCircuit.INIT_BOARD_CH23)
-                rem = MarbleCircuit.INIT_REM_CH23
+                board = list(self._ch_config["init_board"])
+                rem = self._ch_config["init_rem"]
             return self._encode_ch23(board, rem)
         parts = s.split("_")
         if len(parts) >= 3 and len(parts[0]) >= 4:
@@ -429,9 +421,9 @@ class MarbleCircuit(Game):
         return self._encode(board, rem_s, rem_L)
 
     def move_to_string(self, move: int, mode: StringMode) -> str:
-        if self._is_ch23:
-            if move >= self.CH23_REMOVE_MOVE_BASE:
-                slot = move - self.CH23_REMOVE_MOVE_BASE
+        if self._is_pyramid:
+            if move >= self.PYRAMID_REMOVE_MOVE_BASE:
+                slot = move - self.PYRAMID_REMOVE_MOVE_BASE
                 if mode == StringMode.AUTOGUI:
                     return f"R_{slot}_x"
                 return f"({slot},-)"
