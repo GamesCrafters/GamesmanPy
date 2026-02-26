@@ -12,23 +12,47 @@ class TUI:
 
 
     def play(self, game: Game, variant: str):
+        import sqlite3
         db = SqliteDB(game.id, variant)
+        use_db = True
+        try:
+            _ = db.get(game.start())
+        except sqlite3.OperationalError:
+            use_db = False
+            print("(No solver database for this game — playing without win/loss hints.)")
         curr_pos = game.start()
         while game.primitive(curr_pos) is None:
             print("Current position:")
             self.print_position(game, curr_pos)
             moves = game.generate_moves(curr_pos)
-            (curr_rem, curr_val) = db.get(curr_pos)
-            print(f'Position is a {"win" if curr_val == Value.Win else "lose"} in {curr_rem} moves.')
+            if use_db:
+                entry = db.get(curr_pos)
+                if entry is not None:
+                    curr_rem, curr_val = entry
+                    print(f'Remoteness: {curr_rem}  ({"win" if curr_val == Value.Win else "lose"} in {curr_rem} moves)')
+                else:
+                    print("Remoteness: —")
+            else:
+                print("Remoteness: —  (no solver database)")
             moves_map = {self.get_move_string(game, move): move for move in moves}
-            for move in moves_map.keys():
-                possible = game.do_move(curr_pos, moves_map[move])
-                (rem, val) = db.get(possible)
-                print(f'{move}: {"Winning Move" if self.get_move_value(val) == Value.Win else "Losing Move"} in {rem}')
+            if use_db:
+                for move in moves_map.keys():
+                    possible = game.do_move(curr_pos, moves_map[move])
+                    entry = db.get(possible)
+                    if entry is not None:
+                        rem, val = entry
+                        print(f'  {move}: remoteness {rem}  — {"Winning" if self.get_move_value(val) == Value.Win else "Losing"}')
+            else:
+                print("Moves:", ", ".join(moves_map.keys()))
             user_move = self.get_valid_move(moves_map.keys())
             curr_pos = game.do_move(curr_pos, moves_map[user_move])
         self.print_position(game, curr_pos)
-        print("GAME OVER")
+        result = game.primitive(curr_pos)
+        print("GAME OVER" + (" — You win!" if result == Value.Win else " — No solution."))
+        if hasattr(game, "get_exit_counts_display"):
+            msg = game.get_exit_counts_display(curr_pos)
+            if msg:
+                print(msg)
 
     def get_move_value(self, child_val):
         if self.game.n_players == 1:

@@ -1,6 +1,7 @@
 from .clobber import Clobber
 from .horses import Horses
 from .lightsout import LightsOut
+from .marble_circuit import MarbleCircuit
 from .pancakes import Pancakes
 from models import *
 
@@ -8,6 +9,7 @@ game_list = {
     "clobber": Clobber,
     "horses": Horses,
     "lightsout": LightsOut,
+    "marble_circuit": MarbleCircuit,
     "pancakes": Pancakes,
 }
 
