@@ -91,10 +91,12 @@ class MarbleCircuit(Game):
     GOALS_CH1 = [(0, 0), (1, 1)]
     INIT_REM_CH1 = (1, 0)
 
-    # ch23：固定块在槽 0,1,4,7,9；槽 2,3,5,6,8 由用户每次摆放。拓扑随块摆放由 _get_topology_ch23(board) 计算，球路据此 + 块类型。
+    # ch23：固定块在槽 0,1,4,7,9（玩家不能 remove）；槽 2,3,5,6,8 由用户摆放、可 remove。
+    # 拓扑随块摆放由 _get_topology_ch23(board) 计算，球路据此 + 块类型。
     # 块类型 1=青绿 2=橘 3=黄 4=玫红。固定：0=黄,1=青绿,4=玫红,7=橘,9=黄。
     # Solver：支持「放置」与「移除」两种操作；remoteness = 到终局的最少步数（每步放或拿都算 1 步）。
     INIT_BOARD_CH23 = [3, 1, 0, 0, 4, 0, 0, 2, 0, 3]  # 0-based；0,1,4,7,9 已摆，2,3,5,6,8 空待填
+    FIXED_SLOTS_CH23 = (0, 1, 4, 7, 9)  # 固定块位置，玩家不能 remove
     INIT_REM_CH23 = (2, 1, 0, 2)  # 青绿、橘、黄、玫红 剩余
     EXIT_COUNTS_CH23 = [0, 1, 4, 3, 0]  # 5 个出口各要几颗球
     # 答案（1～10 号槽）：黄绿绿橘玫红玫红玫红橘绿黄 → 全填满后的板子
@@ -298,8 +300,8 @@ class MarbleCircuit(Game):
                     for btype, cnt in rem:
                         if cnt > 0:
                             moves.append(slot * 4 + (btype - 1))  # place
-                else:
-                    moves.append(self.CH23_REMOVE_MOVE_BASE + slot)  # remove
+                elif slot not in MarbleCircuit.FIXED_SLOTS_CH23:
+                    moves.append(self.CH23_REMOVE_MOVE_BASE + slot)  # remove（仅非固定槽）
             return moves
         board, rem_s, rem_L = self._decode(position)
         moves = []
@@ -320,6 +322,8 @@ class MarbleCircuit(Game):
             teal, orange, yellow, magenta = rem
             if move >= self.CH23_REMOVE_MOVE_BASE:
                 slot = move - self.CH23_REMOVE_MOVE_BASE
+                if slot in MarbleCircuit.FIXED_SLOTS_CH23:
+                    raise ValueError("Cannot remove from fixed slot")
                 btype = board[slot]
                 board = list(board)
                 board[slot] = 0
