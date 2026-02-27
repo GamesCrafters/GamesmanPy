@@ -9,12 +9,23 @@ puzzles = {
         (2, 0, 2),
         (2, 2, 1),
         (3, 3, 1)
+    ],
+    "6x6": [
+(0, 0, 2),
+        (3, 0, 4), 
+        (5, 0, 2), 
+        (0, 3, 2), 
+        (3, 3, 2), 
+        (1, 4, 1), 
+        (5, 4, 2), 
+        (0, 5, 2), 
+        (2, 5, 1)  
     ]
 }
 
 class Hashi(Game):
     id = 'hashi'
-    variants = ["4x4"]
+    variants = ["4x4", "6x6"]
     n_players = 1
     cyclic = True
 
@@ -133,53 +144,63 @@ class Hashi(Game):
 
     def to_string(self, position: int, mode: StringMode) -> str:
         """
-        Returns a string representation of the position based on the given mode.
+        Returns a string representation of the position with coordinate visualization.
         """
-        output = []
-        for e in range(self.num_edges):
-            bridge_count = (position // (3 ** e)) % 3
-            x1,y1 = self.edges[e][0]
-            x2, y2 = self.edges[e][1]
-            output.append(f'Edge {e}: ({x1}, {y1}), ({x2}, {y2}), bridges: {bridge_count}')
-        
         nodes = puzzles[self._variant_id]
+        
         min_x = min(n[0] for n in nodes)
         max_x = max(n[0] for n in nodes)
         min_y = min(n[1] for n in nodes)
         max_y = max(n[1] for n in nodes)
 
         total_logical_width = max_x - min_x
-        if total_logical_width > 20:
-            x_step, y_step = 2, 1 # Compact for large puzzles
-        else:
-            x_step, y_step = 4, 2 # Clear for small puzzles
+        x_step, y_step = (4, 2) if total_logical_width <= 15 else (2, 1)
 
-        grid_w = max_x * 4 + 1
-        grid_h = max_y * 2 + 1
+        grid_w = max_x * x_step + 1
+        grid_h = max_y * y_step + 1
         grid = [[' ' for _ in range(grid_w)] for _ in range(grid_h)]
 
-        # Plot nodes
         for x, y, val in nodes:
             grid[y * y_step][x * x_step] = str(val)
 
-        # Plot bridges
         for i, ((x1, y1), (x2, y2)) in enumerate(self.edges):
             bridges = (position // (3 ** i)) % 3
             if bridges == 0:
                 continue
 
-            if x1 == x2:  # Vertical
+            if x1 == x2:  # Vertical Bridge
                 char = '|' if bridges == 1 else '#'
                 start_y, end_y = min(y1, y2), max(y1, y2)
-                for x_pixel in range(start_x * x_step + 1, end_x * x_step):
-                    grid[y1 * y_step][x_pixel] = char
-            else:  # Horizontal
+                for y_pixel in range(start_y * y_step + 1, end_y * y_step):
+                    grid[y_pixel][x1 * x_step] = char
+            else:  # Horizontal Bridge
                 char = '-' if bridges == 1 else '='
                 start_x, end_x = min(x1, x2), max(x1, x2)
-                for x in range(start_x * 4 + 1, end_x * 4):
-                    grid[y1 * 2][x] = char
+                for x_pixel in range(start_x * x_step + 1, end_x * x_step):
+                    grid[y1 * y_step][x_pixel] = char
 
-        print('\n'.join(''.join(row).rstrip() for row in grid))
+        # Add X-axis labels at the top
+        header = "    " + "".join(str(i).ljust(x_step) for i in range(max_x + 1))
+        
+        rows = []
+        for y_idx, row_chars in enumerate(grid):
+            # Add Y-axis labels every y_step rows
+            if y_idx % y_step == 0:
+                y_label = str(y_idx // y_step).rjust(2) + " "
+            else:
+                y_label = "   "
+            rows.append(y_label + "".join(row_chars).rstrip())
+        
+        grid_display = header + "\n" + "\n".join(rows)
+
+        # 5. Build Metadata Output
+        output = []
+        for e in range(self.num_edges):
+            b_count = (position // (3 ** e)) % 3
+            (ex1, ey1), (ex2, ey2) = self.edges[e]
+            output.append(f'Edge {e}: ({ex1}, {ey1})-({ex2}, {ey2}), bridges: {b_count}')
+
+        print(grid_display)
         return '\n'.join(output)
 
     def from_string(self, strposition: str) -> int:
