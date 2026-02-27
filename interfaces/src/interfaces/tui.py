@@ -18,6 +18,7 @@ class TUI:
             print("Current position:")
             self.print_position(game, curr_pos)
             moves = game.generate_moves(curr_pos)
+            # print("MOVES: ", moves)
             (curr_rem, curr_val) = db.get(curr_pos)
             print(f'Position is a {"win" if curr_val == Value.Win else "lose"} in {curr_rem} moves.')
             moves_map = {self.get_move_string(game, move): move for move in moves}
@@ -25,6 +26,7 @@ class TUI:
                 possible = game.do_move(curr_pos, moves_map[move])
                 (rem, val) = db.get(possible)
                 print(f'{move}: {"Winning Move" if self.get_move_value(val) == Value.Win else "Losing Move"} in {rem}')
+            # print(moves_map.keys())
             user_move = self.get_valid_move(moves_map.keys())
             curr_pos = game.do_move(curr_pos, moves_map[user_move])
         self.print_position(game, curr_pos)

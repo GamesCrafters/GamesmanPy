@@ -67,6 +67,7 @@ class Hashi(Game):
                                     break
             if not between:
                 moves.append(i)
+        # print(moves)
 
         return moves
     
@@ -129,12 +130,6 @@ class Hashi(Game):
         
         return None
 
-        
-
-
-
-
-
 
     def to_string(self, position: int, mode: StringMode) -> str:
         """
@@ -146,6 +141,45 @@ class Hashi(Game):
             x1,y1 = self.edges[e][0]
             x2, y2 = self.edges[e][1]
             output.append(f'Edge {e}: ({x1}, {y1}), ({x2}, {y2}), bridges: {bridge_count}')
+        
+        nodes = puzzles[self._variant_id]
+        min_x = min(n[0] for n in nodes)
+        max_x = max(n[0] for n in nodes)
+        min_y = min(n[1] for n in nodes)
+        max_y = max(n[1] for n in nodes)
+
+        total_logical_width = max_x - min_x
+        if total_logical_width > 20:
+            x_step, y_step = 2, 1 # Compact for large puzzles
+        else:
+            x_step, y_step = 4, 2 # Clear for small puzzles
+
+        grid_w = max_x * 4 + 1
+        grid_h = max_y * 2 + 1
+        grid = [[' ' for _ in range(grid_w)] for _ in range(grid_h)]
+
+        # Plot nodes
+        for x, y, val in nodes:
+            grid[y * y_step][x * x_step] = str(val)
+
+        # Plot bridges
+        for i, ((x1, y1), (x2, y2)) in enumerate(self.edges):
+            bridges = (position // (3 ** i)) % 3
+            if bridges == 0:
+                continue
+
+            if x1 == x2:  # Vertical
+                char = '|' if bridges == 1 else '#'
+                start_y, end_y = min(y1, y2), max(y1, y2)
+                for x_pixel in range(start_x * x_step + 1, end_x * x_step):
+                    grid[y1 * y_step][x_pixel] = char
+            else:  # Horizontal
+                char = '-' if bridges == 1 else '='
+                start_x, end_x = min(x1, x2), max(x1, x2)
+                for x in range(start_x * 4 + 1, end_x * 4):
+                    grid[y1 * 2][x] = char
+
+        print('\n'.join(''.join(row).rstrip() for row in grid))
         return '\n'.join(output)
 
     def from_string(self, strposition: str) -> int:
@@ -159,7 +193,7 @@ class Hashi(Game):
             if not line:
                 continue
             bridge_count = int(line.split('bridges: ')[1])
-            position += bridge_count * (3 ** e)
+            position += bridge_count * (3 ** i)
 
         return position
     def move_to_string(self, move: int, mode: StringMode) -> str:
@@ -170,7 +204,9 @@ class Hashi(Game):
         x1,y1 = self.edges[ind][0]
         x2,y2 = self.edges[ind][1]
 
-        return f"Bridge is at edge {ind}: ({x1}, {y1}) to ({x2}, {y2})"
+        return f"edge {ind}"
+
+        # return f"Bridge is at edge {ind}: ({x1}, {y1}) to ({x2}, {y2})"
 
 
     def gen_edges(self):
