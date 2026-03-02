@@ -37,7 +37,7 @@ class Game(ABC):
         raise NotImplementedError("primitive() not implemented.")
 
     @abstractmethod
-    def to_string(self, position: int, mode: StringMode) -> str:
+    def to_string(self, position, mode: StringMode) -> str:
         """
         Returns a string representation of the position based on the given mode.
         """
@@ -57,3 +57,9 @@ class Game(ABC):
         Returns a string representation of the move based on the given mode.
         """
         raise NotImplementedError("move_to_string() not implemented.")
+    
+    def hash_ext(self, position) -> int:
+        return position
+    
+    def unhash_ext(self, hashed_pos) -> int:
+        return hashed_pos

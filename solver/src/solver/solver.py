@@ -50,19 +50,20 @@ class Solver:
                 print(f"{self.game.id}, variant: {variant} already solved.")
 
     def get_children(self, position):
-        moves = self.game.generate_moves(position)
-        children = list(map(lambda m: self.game.do_move(position, m), moves))
+        unhashed = self.game.unhash_ext(position)
+        moves = self.game.generate_moves(unhashed)
+        children = list(map(lambda m: self.game.hash_ext(self.game.do_move(unhashed, m)), moves))
         return children
 
     def discover(self):
         visited = set()
         q = deque()
-        start = self.game.start()
+        start = self.game.hash_ext(self.game.start())
         q.appendleft(start)
         visited.add(start)
         while q:
             position = q.pop()
-            value = self.game.primitive(position)
+            value = self.game.primitive(self.game.unhash_ext(position))
             if value is not None:
                 self.solution[position] = (REMOTENESS_TERMINAL, value)
                 self.unsolved_children[position] = 0
