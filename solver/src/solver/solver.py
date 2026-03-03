@@ -147,9 +147,3 @@ class Solver:
                 return Value.Win
             else:
                 return val
-
-    def get_remoteness(self, state: int) -> int:
-        rem, _ = self.db.get(state)
-        if rem is None:
-            return -1
-        return rem
