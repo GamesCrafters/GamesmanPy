@@ -27,7 +27,7 @@ class Pancakes(Game):
         direction_choices = [0, 1]
         random.shuffle(widths)
         directions = [random.choice(direction_choices) for _ in range(self.height)]
-        return (widths, directions)
+        return self.hash(widths, directions)
     
     def generate_moves(self, position: int) -> list[int]:
         """
@@ -39,18 +39,18 @@ class Pancakes(Game):
         """
         Returns the resulting position of applying move to position.
         """
-        (widths, dirs) = position
+        (widths, dirs) = self.unhash(position)
         new_widths = widths[:]
         new_dirs = dirs[:]
         new_widths[move:] = reversed(widths[move:])
         new_dirs[move:] = [x ^ 0b1 for x in  reversed(dirs[move:])]
-        return (new_widths, new_dirs)
+        return self.hash(new_widths, new_dirs)
 
     def primitive(self, position) -> Optional[Value]:
         """
         Returns a Value enum which defines whether the current position is a win, loss, or non-terminal. 
         """
-        (widths, dirs) = position
+        (widths, dirs) = self.unhash(position)
         correct_order = widths == sorted(widths, reverse=True)
         correct_direction = all(x == 0 for x in dirs)
         if correct_order and correct_direction:
@@ -63,7 +63,7 @@ class Pancakes(Game):
         """
         pos_arr = []
         adder = ord('a') - 1
-        (widths, dirs) = position
+        (widths, dirs) = self.unhash(position)
         for i in range(self.height):
             val = str(widths[i]) if dirs[i] == 0 else chr(widths[i] + adder)
             pos_arr.append(val)
@@ -87,7 +87,7 @@ class Pancakes(Game):
             else:
                 dirs.append(0)
                 widths.append(int(char))
-        return (widths, dirs)
+        return self.hash(widths, dirs)
 
 
 
@@ -97,8 +97,7 @@ class Pancakes(Game):
         """
         return f'A_-_{move}_x'
 
-    def hash_ext(self, position) -> int:
-        (widths, directions) = position
+    def hash(self, widths, directions) -> int:
         h = 0
         n = self.height
         for i in range(n):
@@ -111,7 +110,7 @@ class Pancakes(Game):
         h = (h << n) | direction_hash
         return h
 
-    def unhash_ext(self, position) -> tuple[list[int]]:
+    def unhash(self, position) -> tuple[list[int]]:
         width_arr = []
         direction_arr = []
         n = self.height

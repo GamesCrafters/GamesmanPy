@@ -13,9 +13,9 @@ Required functions:
 * `to_string` : transform and return the given integer position into a string representation, based on the given mode.
 * `from_string` : transform and return the given `StringMode.Readable` position string into the integer representation.
 * `move_to_string` : transform and return the given integer move into a string representation, based on the given mode.
+* `hash_ext` : given a position, return a number representing the hash number of the position. If you decide not to implement this function, the default behavior is returning position. Therefore, position will have to be an integer. 
 
 Recommended functions:
-* `hash` : used to transform an internal, readable representation of a position into an integer in a reversible way. You can design this as you see fit. May be unnecessary for games/puzzles that have an obvious integer state representation (i.e. ten-to-zero).
-* `unhash` : reverse of hash.
+* `unhash_ext` : reverse of hash_ext. The default behavior is to return hashed position, which, by default, is just an integer. Refer to hash_ext for details on default behavior.
 
 Run `uv run solver <your_game_name>` to solve all variants, or add `-v <variant_name>` for specific variants. To overwrite an existing database and resolve, add `-o`.
