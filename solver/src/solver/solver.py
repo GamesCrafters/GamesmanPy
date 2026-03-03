@@ -1,4 +1,4 @@
-from collections import deque
+from collections import deque, defaultdict
 from models import *
 from database import DuckDB, SqliteDB
 import time
@@ -10,7 +10,7 @@ class Solver:
     def __init__(self, game: Game):
         self._game = game
         self.solution = {}
-        self.parent_map = {}
+        self.parent_map = defaultdict(list)
         self.unsolved_children = {}
 
     def solve(self, overwrite=False, variant=None):
@@ -22,7 +22,7 @@ class Solver:
 
         for variant in variants:
             self.solution = {}
-            self.parent_map = {}
+            self.parent_map = defaultdict(list)
             self.unsolved_children = {}
             self.game = self._game(variant)
             self.db = SqliteDB(self._game.id, variant, ro=False)
@@ -49,99 +49,92 @@ class Solver:
             else:
                 print(f"{self.game.id}, variant: {variant} already solved.")
 
-    def get_children(self, position):
-        unhashed = self.game.unhash_ext(position)
-        moves = self.game.generate_moves(unhashed)
-        children = list(map(lambda m: self.game.hash_ext(self.game.do_move(unhashed, m)), moves))
+    def get_children(self, position, generate_moves, do_move):
+        moves = generate_moves(position)
+        children = list(map(lambda m: do_move(position, m), moves))
         return children
 
     def discover(self):
         visited = set()
         q = deque()
-        start = self.game.hash_ext(self.game.start())
-        q.appendleft(start)
-        visited.add(start)
-        while q:
-            position = q.pop()
-            value = self.game.primitive(self.game.unhash_ext(position))
-            if value is not None:
-                self.solution[position] = (REMOTENESS_TERMINAL, value)
-                self.unsolved_children[position] = 0
-            else:
-                children = self.get_children(position)
-                self.unsolved_children[position] = len(children)
-                if not children and self.game.n_players == 1:
-                    self.solution[position] = (REMOTENESS_TERMINAL, Value.Loss)
+        start = self.game.start()
 
-                for child in children:
-                    if not self.parent_map.get(child):
-                        self.parent_map[child] = set()
-                    self.parent_map[child].add(position)
-                    if child not in visited:
-                        visited.add(child)
-                        q.appendleft(child)
-    
+        hash_ext = self.game.hash_ext
+        primitive = self.game.primitive
+        do_move = self.game.do_move
+        gen_moves = self.game.generate_moves
+        n_players = self.game.n_players
+
+        q.appendleft(start)
+        visited.add(hash_ext(start))
+        while q:
+            position = q.popleft()
+            hashed_position = hash_ext(position)
+            value = primitive(position)
+            if value is not None:
+                self.solution[hashed_position] = (REMOTENESS_TERMINAL, value)
+                self.unsolved_children[hashed_position] = 0
+            else:
+                children = self.get_children(position, gen_moves, do_move)
+                unique_children = {hash_ext(c): c for c in children}
+                self.unsolved_children[hashed_position] = len(unique_children)
+                if not unique_children and n_players == 1:
+                    self.solution[hashed_position] = (REMOTENESS_TERMINAL, Value.Loss)
+
+                for hashed_child, child in unique_children.items():
+                    self.parent_map[hashed_child].append(hashed_position)
+                    
+                    if hashed_child not in visited:
+                        visited.add(hashed_child)
+                        q.append(child)
+
+
     def propagate(self):
         wins = deque()
         ties = deque()
         losses = deque()
+
         for pos, (_, val) in self.solution.items():
             match val:
-                case Value.Win: wins.appendleft(pos)
-                case Value.Tie: ties.appendleft(pos)
-                case Value.Loss: losses.appendleft(pos)
+                case Value.Win: wins.append(pos)
+                case Value.Tie: ties.append(pos)
+                case Value.Loss: losses.append(pos)
         while wins or ties or losses:
-            position = None
+            hashed_position = None
             if losses:
-                position = losses.pop()
+                hashed_position = losses.popleft()
             elif wins:
-                position = wins.pop()
+                hashed_position = wins.popleft()
             else:
-                position = ties.pop()
-            (curr_rem, curr_val) = self.solution.get(position)
+                hashed_position = ties.popleft()
+            (curr_rem, curr_val) = self.solution[hashed_position]
             parent_rem = curr_rem + 1
             parent_val: Value = self.parent_value(curr_val)
-            parents = self.parent_map.get(position, set())
-            for parent in parents:
-                unsolved_children = self.unsolved_children[parent]
+            parents = self.parent_map.get(hashed_position, [])
+            for hashed_parent in parents:
+                unsolved_children = self.unsolved_children[hashed_parent]
                 if unsolved_children == 0:
                     continue
                 if parent_val == Value.Loss:
-                    self.unsolved_children[parent] = unsolved_children - 1
+                    self.unsolved_children[hashed_parent] -= 1
                 else:
-                    self.unsolved_children[parent] = 0
-                ex_parent_sol = self.solution.get(parent)
-                if ex_parent_sol is None:
-                    self.solution[parent] = (parent_rem, parent_val)
-                else:
-                    (ex_parent_rem, ex_parent_val) = ex_parent_sol
-                    propagate = False
-                    if ex_parent_val < parent_val:
-                        propagate = True
-                    elif ex_parent_val == parent_val:
-                        if ex_parent_val == Value.Loss:
-                            if ex_parent_rem < parent_rem:
-                                propagate = True
-                        elif ex_parent_rem > parent_rem:
-                            propagate = True
-                    if propagate:
-                        self.solution[parent] = (parent_rem, parent_val)
-                if self.unsolved_children[parent] == 0:
-                    (_, p_val) = self.solution[parent]
-                    match p_val:
-                        case Value.Win: wins.appendleft(parent)
-                        case Value.Tie: ties.appendleft(parent)
-                        case Value.Loss: losses.appendleft(parent)
-                    
+                    self.unsolved_children[hashed_parent] = 0
+                
+                if self.unsolved_children[hashed_parent] == 0:
+                    self.solution[hashed_parent] = (parent_rem, parent_val)
+                    match parent_val:
+                        case Value.Win: wins.append(hashed_parent)
+                        case Value.Tie: ties.append(hashed_parent)
+                        case Value.Loss: losses.append(hashed_parent)
 
     def resolve_draws(self):
-        for pos in self.unsolved_children.keys():
+        for pos_hash in self.unsolved_children.keys():
             if self.game.n_players == 2:
-                if self.unsolved_children[pos] > 0:
-                    self.solution[pos] = (REMOTENESS_DRAW, Value.Draw)
+                if self.unsolved_children[pos_hash] > 0:
+                    self.solution[pos_hash] = (REMOTENESS_DRAW, Value.Draw)
             else:
-                if pos not in self.solution or self.unsolved_children[pos] > 0:
-                    self.solution[pos] = (REMOTENESS_DRAW, Value.Loss)
+                if pos_hash not in self.solution or self.unsolved_children[pos_hash] > 0:
+                    self.solution[pos_hash] = (REMOTENESS_DRAW, Value.Loss)
             
     
     def parent_value(self, val: Value) -> Value:
@@ -154,15 +147,7 @@ class Solver:
                 return Value.Win
             else:
                 return val
-    
-    def print(self):
-        if self.solution:
-            sol = [(position, rem, value) for position, (rem, value) in self.solution.items()]
-        else:
-            sol = self.db.get_all()
-        for (position, rem, value) in sol:
-            print(f'state: {self.game.to_string(position, StringMode.Readable)} | remoteness: {rem} | value: {Value(value).name}')
-    
+
     def get_remoteness(self, state: int) -> int:
         rem, _ = self.db.get(state)
         if rem is None:
