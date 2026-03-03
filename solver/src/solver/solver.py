@@ -66,7 +66,7 @@ class Solver:
         n_players = self.game.n_players
 
         q.appendleft(start)
-        visited.add(hash_ext(start))
+        visited.add(start)
         while q:
             position = q.popleft()
             hashed_position = hash_ext(position)
@@ -76,17 +76,23 @@ class Solver:
                 self.unsolved_children[hashed_position] = 0
             else:
                 children = self.get_children(position, gen_moves, do_move)
+
                 unique_children = {hash_ext(c): c for c in children}
-                self.unsolved_children[hashed_position] = len(unique_children)
+                if self.unsolved_children.get(hashed_position, None) is None:
+                    self.unsolved_children[hashed_position] = 0
+                
                 if not unique_children and n_players == 1:
                     self.solution[hashed_position] = (REMOTENESS_TERMINAL, Value.Loss)
 
-                for hashed_child, child in unique_children.items():
-                    self.parent_map[hashed_child].append(hashed_position)
-                    
-                    if hashed_child not in visited:
-                        visited.add(hashed_child)
+                for child in children:
+                    if child not in visited:
+                        visited.add(child)
                         q.append(child)
+
+                for hashed_child, child in unique_children.items():
+                    if hashed_child != hashed_position:
+                        self.parent_map[hashed_child].append(hashed_position)
+                        self.unsolved_children[hashed_position] += 1
 
 
     def propagate(self):
