@@ -59,6 +59,7 @@ class Solver:
         q = deque()
         start = self.game.start()
 
+        no_hash = hasattr(self.game, "no_hash")
         hash_ext = self.game.hash_ext
         primitive = self.game.primitive
         do_move = self.game.do_move
@@ -66,7 +67,10 @@ class Solver:
         n_players = self.game.n_players
 
         q.appendleft(start)
-        visited.add(start)
+        if no_hash is None:
+            visited.add(hash_ext(start))
+        else:
+            visited.add(start)
         while q:
             position = q.popleft()
             hashed_position = hash_ext(position)
@@ -75,24 +79,20 @@ class Solver:
                 self.solution[hashed_position] = (REMOTENESS_TERMINAL, value)
                 self.unsolved_children[hashed_position] = 0
             else:
-                children = self.get_children(position, gen_moves, do_move)
-
-                unique_children = {hash_ext(c): c for c in children}
-                if self.unsolved_children.get(hashed_position, None) is None:
-                    self.unsolved_children[hashed_position] = 0
-                
-                if not unique_children and n_players == 1:
+                children = self.get_children(position, gen_moves, do_move)    
+                if not children and n_players == 1:
                     self.solution[hashed_position] = (REMOTENESS_TERMINAL, Value.Loss)
 
                 for child in children:
-                    if child not in visited:
-                        visited.add(child)
-                        q.append(child)
-
-                for hashed_child, child in unique_children.items():
+                    hashed_child = hash_ext(child)
+                    child_alt = hashed_child if no_hash is None else child
                     if hashed_child != hashed_position:
                         self.parent_map[hashed_child].append(hashed_position)
-                        self.unsolved_children[hashed_position] += 1
+                        prev_unsolved = self.unsolved_children.get(hashed_position, 0)
+                        self.unsolved_children[hashed_position] = prev_unsolved + 1
+                    if child_alt not in visited:
+                        visited.add(child_alt)
+                        q.append(child)
 
 
     def propagate(self):
