@@ -67,10 +67,10 @@ class Solver:
         n_players = self.game.n_players
 
         q.appendleft(start)
-        if no_hash is None:
-            visited.add(hash_ext(start))
-        else:
+        if no_hash:
             visited.add(start)
+        else:
+            visited.add(hash_ext(start))
         while q:
             position = q.popleft()
             hashed_position = hash_ext(position)
@@ -85,7 +85,7 @@ class Solver:
 
                 for child in children:
                     hashed_child = hash_ext(child)
-                    child_alt = hashed_child if no_hash is None else child
+                    child_alt = child if no_hash else hashed_child
                     if hashed_child != hashed_position:
                         self.parent_map[hashed_child].append(hashed_position)
                         prev_unsolved = self.unsolved_children.get(hashed_position, 0)
