@@ -191,17 +191,19 @@ class LunarLockout(Game):
         """
         Returns a string representation of the position based on the given mode.
         """
-        robots = self.unpack(position)
+        robot_positions = self.unpack(position)
 
         board = [["." for _ in range(5)] for _ in range(5)]
-        board[2][2] = "X"       
+        board[2][2] = "x"
         symbols = ["R", "A", "B", "C", "D"]     
-        for i, pos in enumerate(robots):
-            if pos == 31:
+
+        for index, position in enumerate(robot_positions):
+            if position == 31:
                 continue
-            r = pos // 5
-            c = pos % 5
-            board[r][c] = symbols[i]        
+            row = position // 5
+            col = position % 5
+            board[row][col] = symbols[index]        
+            
         return "\n".join(" ".join(row) for row in board)
 
 
@@ -218,18 +220,18 @@ class LunarLockout(Game):
 
         robots = [31, 31, 31, 31, 31]       
         symbol_map = {
-        "R": 0,
-        "A": 1,
-        "B": 2,
-        "C": 3,
-        "D": 4
+            "R": 0,
+            "A": 1,
+            "B": 2,
+            "C": 3,
+            "D": 4
         }       
-        for r in range(5):
-            cells = lines[r].split()
+        for robot in range(5):
+            cells = lines[robot].split()
             for c in range(5):
                 cell = cells[c]
                 if cell in symbol_map:
-                    idx = r * 5 + c
+                    idx = robot * 5 + c
                     robots[symbol_map[cell]] = idx      
         return self.pack(robots)     
 
@@ -243,7 +245,6 @@ class LunarLockout(Game):
         direction = move % 4
 
         directions = ["UP", "RIGHT", "DOWN", "LEFT"]
-
         if robot == 0:
             name = "Red"
         else:
