@@ -9,8 +9,8 @@ class LunarLockout(Game):
     cyclic = True
 
     _move_up = 0
-    _move_down = 1
-    _move_right = 2
+    _move_right = 1
+    _move_down = 2
     _move_left = 3
 
     # Store the variant and board dimensions (5x5).
@@ -47,9 +47,9 @@ class LunarLockout(Game):
         # Directions
         self._directions = {
             self._move_up:    (-1, 0),
+            self._move_right: ( 0, 1),
             self._move_down:  ( 1, 0),
             self._move_left:  ( 0, -1),
-            self._move_right: ( 0, 1),
         }
 
 
@@ -62,11 +62,11 @@ class LunarLockout(Game):
         Returns the starting position of the game.
         """
         # All values must be 0–24 and no duplicates.
-        red = 7
-        r1 = 11
-        r2 = 13
-        r3 = 17
-        r4 = 22
+        red = 20
+        r1 = 7
+        r2 = 16
+        r3 = 0
+        r4 = 23
         robots = [red, r1, r2, r3, r4]
         if red == 12:
             raise ValueError("Red cannot start at exit")
@@ -94,14 +94,35 @@ class LunarLockout(Game):
         """
         robots = self.unpack(position)
         moves = []
+
         for robot_index in range(self._robot_count):
-            # Skip robots that have been removed
+
             if robots[robot_index] == self._removed:
                 continue
-            # Each active robot can attempt all four directions
+
+            start_cell = robots[robot_index]
+            start_row = start_cell // self._cols
+            start_col = start_cell % self._cols
+
             for direction in range(4):
-                move = robot_index * 4 + direction
-                moves.append(move)
+
+                step_row, step_col = self._directions[direction]
+                row = start_row
+                col = start_col
+
+                while True:
+                    row += step_row
+                    col += step_col
+
+                    if not (0 <= row < self._rows and 0 <= col < self._cols):
+                        break
+
+                    cell = row * self._cols + col
+
+                    if cell in robots and cell != start_cell:
+                        moves.append(robot_index * 4 + direction)
+                        break
+
         return moves
 
 
@@ -117,50 +138,39 @@ class LunarLockout(Game):
         """
         Returns the resulting position of applying move to position.
         """
-        robot_positions = self.unpack(position)
-        # Get new robot position and direction
-        robot_index = move // 4 # 7/4 = index 1
-        direction = move % 4    # 7%4 = direction 3
+        robots = self.unpack(position)
 
-        # Handle removed robot
-        if robot_positions[robot_index] == self._removed:
+        robot_index = move // 4
+        direction = move % 4
+
+        if robots[robot_index] == self._removed:
             return position
-        
-        # Current Robot position
-        cell = robot_positions[robot_index]
-        row = cell // self._cols
-        col = cell % self._cols
-        # Move Direction Step
-        move_row, move_col = self._directions[direction] # Gives step by step movements
 
-        # Move Robots
+        row = robots[robot_index] // self._cols
+        col = robots[robot_index] % self._cols
+
+        step_row, step_col = self._directions[direction]
+
         while True:
-            next_row = row + move_row
-            next_col = col + move_col
+            next_row = row + step_row
+            next_col = col + step_col
 
-            # Handle robot getting out of space
             if not (0 <= next_row < self._rows and 0 <= next_col < self._cols):
-                robot_positions[robot_index] = self._removed
+                robots[robot_index] = self._removed
                 break
 
             next_cell = next_row * self._cols + next_col
 
-            # Move robot until block
-            blocked = False
-            for i in range(self._robot_count):
-                if i != robot_index and robot_positions[i] == next_cell:
-                    blocked = True
-                    break
-            if blocked:
+            if next_cell in robots and next_cell != robots[robot_index]:
                 break
 
             row = next_row
             col = next_col
 
-        if robot_positions[robot_index] != self._removed:
-            robot_positions[robot_index] = row * self._cols + col
+        if robots[robot_index] != self._removed:
+            robots[robot_index] = row * self._cols + col
 
-        return self.pack(robot_positions)
+        return self.pack(robots)
 
 
     # Decode the state.
@@ -195,7 +205,8 @@ class LunarLockout(Game):
 
         board = [["." for _ in range(5)] for _ in range(5)]
         board[2][2] = "x"
-        symbols = ["R", "A", "B", "C", "D"]     
+        # symbols = ["0", "1", "2", "3", "4"]     
+        symbols = ["R", "A", "B", "C", "D"]  
 
         for index, position in enumerate(robot_positions):
             if position == 31:
@@ -244,6 +255,8 @@ class LunarLockout(Game):
         robot = move // 4
         direction = move % 4
 
+        # directions = ["u", "r", "d", "l"]
+        # name = str(robot)
         directions = ["UP", "RIGHT", "DOWN", "LEFT"]
         if robot == 0:
             name = "Red"
