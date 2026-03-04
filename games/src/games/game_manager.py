@@ -3,11 +3,13 @@ from .horses import Horses
 from .pancakes import Pancakes
 from .test import Test
 from models import *
+from .LunarLockout import LunarLockout
 
 game_list = {
     "clobber": Clobber,
     "horses": Horses,
     "pancakes": Pancakes,
+    "lunar_lockout": LunarLockout,
     "test": Test,
 }
 
