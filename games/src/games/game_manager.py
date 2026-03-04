@@ -1,6 +1,7 @@
 from .clobber import Clobber
 from .horses import Horses
 from .pancakes import Pancakes
+from .test import Test
 from models import *
 from .LunarLockout import LunarLockout
 
@@ -9,6 +10,7 @@ game_list = {
     "horses": Horses,
     "pancakes": Pancakes,
     "lunar_lockout": LunarLockout,
+    "test": Test,
 }
 
 def validate(game_id: str, variant_id: str) -> bool:
