@@ -18,9 +18,11 @@ Required functions:
 For games with multipart moves, the following are required:
 * `generate_single_move` : should generate one part of the multipart move.
 * `resolve_move` : should do one part of the move out of the multipart move.
+
 Note that these functions are made for interfacing with the game. The solver does not use these functions. 
 
 Recommended functions:
 * `unhash_ext` : reverse of hash_ext. The default behavior is to return hashed position, which, by default, is just an integer. Refer to hash_ext for details on default behavior.
 
 Run `uv run solver <your_game_name>` to solve all variants, or add `-v <variant_name>` for specific variants. To overwrite an existing database and resolve, add `-o`.
+
