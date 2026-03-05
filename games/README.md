@@ -15,6 +15,11 @@ Required functions:
 * `move_to_string` : transform and return the given integer move into a string representation, based on the given mode.
 * `hash_ext` : given a position, return a number representing the hash number of the position. If you decide not to implement this function, the default behavior is returning position. Therefore, position will have to be an integer. 
 
+For games with multipart moves, the following are required:
+* `generate_single_move` : should generate one part of the multipart move.
+* `resolve_move` : should do one part of the move out of the multipart move.
+Note that these functions are made for interfacing with the game. The solver does not use these functions. 
+
 Recommended functions:
 * `unhash_ext` : reverse of hash_ext. The default behavior is to return hashed position, which, by default, is just an integer. Refer to hash_ext for details on default behavior.
 
