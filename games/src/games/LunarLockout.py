@@ -111,17 +111,24 @@ class LunarLockout(Game):
                 col = start_col
 
                 while True:
-                    row += step_row
-                    col += step_col
+                    next_row = row + step_row
+                    next_col = col + step_col
 
-                    if not (0 <= row < self._rows and 0 <= col < self._cols):
+                    if not (0 <= next_row < self._rows and 0 <= next_col < self._cols):
+                        if row != start_row or col != start_col:
+                            moves.append(robot_index * 4 + direction)
                         break
 
-                    cell = row * self._cols + col
+                    next_cell = next_row * self._cols + next_col
 
-                    if cell in robots and cell != start_cell:
-                        moves.append(robot_index * 4 + direction)
+                    if next_cell in robots and robots.index(next_cell) != robot_index:
+                        move = robot_index * 4 + direction
+                        if self.do_move(position, move) != position:
+                            moves.append(move)
                         break
+
+                    row = next_row
+                    col = next_col
 
         return moves
 
@@ -203,10 +210,9 @@ class LunarLockout(Game):
         """
         robot_positions = self.unpack(position)
 
-        board = [["." for _ in range(5)] for _ in range(5)]
-        board[2][2] = "x"
-        # symbols = ["0", "1", "2", "3", "4"]     
-        symbols = ["R", "A", "B", "C", "D"]  
+        board = [[" . " for _ in range(5)] for _ in range(5)]
+        board[2][2] = " x "
+        symbols = [" 0 ", " 1 ", " 2 ", " 3 ", " 4 "]     
 
         for index, position in enumerate(robot_positions):
             if position == 31:
@@ -255,13 +261,8 @@ class LunarLockout(Game):
         robot = move // 4
         direction = move % 4
 
-        # directions = ["u", "r", "d", "l"]
-        # name = str(robot)
-        directions = ["UP", "RIGHT", "DOWN", "LEFT"]
-        if robot == 0:
-            name = "Red"
-        else:
-            name = f"Robot {robot}"
+        directions = ["u", "r", "d", "l"]
+        name = str(robot)
 
         return f"{name} {directions[direction]}"
 
