@@ -96,39 +96,14 @@ class LunarLockout(Game):
         moves = []
 
         for robot_index in range(self._robot_count):
-
             if robots[robot_index] == self._removed:
                 continue
 
-            start_cell = robots[robot_index]
-            start_row = start_cell // self._cols
-            start_col = start_cell % self._cols
-
             for direction in range(4):
+                move = robot_index * 4 + direction
 
-                step_row, step_col = self._directions[direction]
-                row = start_row
-                col = start_col
-
-                while True:
-                    next_row = row + step_row
-                    next_col = col + step_col
-
-                    if not (0 <= next_row < self._rows and 0 <= next_col < self._cols):
-                        if row != start_row or col != start_col:
-                            moves.append(robot_index * 4 + direction)
-                        break
-
-                    next_cell = next_row * self._cols + next_col
-
-                    if next_cell in robots and robots.index(next_cell) != robot_index:
-                        move = robot_index * 4 + direction
-                        if self.do_move(position, move) != position:
-                            moves.append(move)
-                        break
-
-                    row = next_row
-                    col = next_col
+                if self.do_move(position, move) != position:
+                    moves.append(move)
 
         return moves
 
@@ -243,13 +218,14 @@ class LunarLockout(Game):
             "C": 3,
             "D": 4
         }       
-        for robot in range(5):
-            cells = lines[robot].split()
-            for c in range(5):
-                cell = cells[c]
+
+        for row in range(5):
+            cells = lines[row].split()
+            for col in range(5):
+                cell = cells[col]
                 if cell in symbol_map:
-                    idx = robot * 5 + c
-                    robots[symbol_map[cell]] = idx      
+                    idx = row * 5 + col
+                    robots[symbol_map[cell]] = idx 
         return self.pack(robots)     
 
     # Decode the move into robot index and direction.
