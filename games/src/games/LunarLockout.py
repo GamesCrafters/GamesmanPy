@@ -182,11 +182,7 @@ class LunarLockout(Game):
     def to_string(self, position: int, mode: StringMode) -> str:
         """
         Returns a string representation of the position based on the given mode.
-        """
-
-        if mode == StringMode.AUTOGUI:
-            return
-            
+        """ 
         robot_positions = self.unpack(position)
 
         board = [["." for _ in range(5)] for _ in range(5)]
@@ -198,7 +194,10 @@ class LunarLockout(Game):
                 continue
             row = position // 5
             col = position % 5
-            board[row][col] = symbols[index]        
+            board[row][col] = symbols[index]    
+
+        if mode == StringMode.AUTOGUI:
+            return "".join(" ".join(row) for row in board)
             
         return "\n".join(" ".join(row) for row in board)
 
