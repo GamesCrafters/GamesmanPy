@@ -2,7 +2,7 @@ from models import Game, Value, StringMode
 from typing import Optional
 
 class LunarLockout(Game):
-    id = 'lunar_lockout'
+    id = 'lunarlockout'
     variants = ["puzzle1"]
     board_size = ["5x5"]
     n_players = 1
@@ -183,11 +183,15 @@ class LunarLockout(Game):
         """
         Returns a string representation of the position based on the given mode.
         """
+
+        if mode == StringMode.AUTOGUI:
+            return
+            
         robot_positions = self.unpack(position)
 
-        board = [[" . " for _ in range(5)] for _ in range(5)]
-        board[2][2] = " x "
-        symbols = [" 0 ", " 1 ", " 2 ", " 3 ", " 4 "]     
+        board = [["." for _ in range(5)] for _ in range(5)]
+        board[2][2] = "x"
+        symbols = ["0", "1", "2", "3", "4"]     
 
         for index, position in enumerate(robot_positions):
             if position == 31:
@@ -208,25 +212,20 @@ class LunarLockout(Game):
         Returns the position from a string representation of the position.
         Input string is StringMode.Readable.
         """
+        strposition = strposition.replace("\\n", "\n")
+
         lines = strposition.strip().split("\n")
 
-        robots = [31, 31, 31, 31, 31]       
-        symbol_map = {
-            "R": 0,
-            "A": 1,
-            "B": 2,
-            "C": 3,
-            "D": 4
-        }       
+        robots = [self._removed] * self._robot_count
 
-        for row in range(5):
-            cells = lines[row].split()
-            for col in range(5):
-                cell = cells[col]
-                if cell in symbol_map:
-                    idx = row * 5 + col
-                    robots[symbol_map[cell]] = idx 
-        return self.pack(robots)     
+        for r, line in enumerate(lines):
+            cells = line.split()
+
+            for c, cell in enumerate(cells):
+                if cell in ["0","1","2","3","4"]:
+                    robots[int(cell)] = r * 5 + c
+
+        return self.pack(robots)
 
     # Decode the move into robot index and direction.
     # Return a readable description of the movement direction.

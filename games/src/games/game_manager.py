@@ -10,7 +10,7 @@ game_list = {
     "clobber": Clobber,
     "horses": Horses,
     "pancakes": Pancakes,
-    "lunar_lockout": LunarLockout,
+    "lunarlockout": LunarLockout,
     "chipschallenge": ChipsChallenge,
     "test": Test,
 }
