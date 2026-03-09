@@ -6,10 +6,10 @@ from .test import Test
 from models import *
 
 game_list = {
+    "chipschallenge": ChipsChallenge,
     "clobber": Clobber,
     "horses": Horses,
     "pancakes": Pancakes,
-    "chipschallenge": ChipsChallenge,
     "test": Test,
 }
 

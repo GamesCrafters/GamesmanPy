@@ -49,10 +49,10 @@ def get_pos(game_id: str, variant_id: str):
     (rem, val) = entry
     moves = []
     if game.primitive(pos) is None:
-        moves = game.generate_moves(pos)
+        moves =  game.generate_single_move(pos, StringMode.AUTOGUI)
     move_objs = []
     for move in moves:
-        new_pos = game.do_move(pos, move)
+        new_pos = game.resolve_move(pos, move)
         new_hashed_pos = game.hash_ext(new_pos)
         child = db.get(new_hashed_pos)
         if child is not None:
