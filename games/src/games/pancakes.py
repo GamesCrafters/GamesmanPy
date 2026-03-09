@@ -35,17 +35,18 @@ class Pancakes(Game):
         """
         return list(range(0, self.height))
     
-    def do_move(self, position: int, move: int) -> int:
+    def do_move(self, position, move: int) -> int:
         """
         Returns the resulting position of applying move to position.
         """
         (widths, dirs) = self.unhash(position)
-        widths[move:] = reversed(widths[move:])
-        dirs[move:] = reversed(dirs[move:])
-        dirs[move:] = [x ^ 0b1 for x in dirs[move:]]
-        return self.hash(widths, dirs)
+        new_widths = widths[:]
+        new_dirs = dirs[:]
+        new_widths[move:] = reversed(widths[move:])
+        new_dirs[move:] = [x ^ 0b1 for x in  reversed(dirs[move:])]
+        return self.hash(new_widths, new_dirs)
 
-    def primitive(self, position: int) -> Optional[Value]:
+    def primitive(self, position) -> Optional[Value]:
         """
         Returns a Value enum which defines whether the current position is a win, loss, or non-terminal. 
         """
@@ -56,7 +57,7 @@ class Pancakes(Game):
             return Value.Win
         return None
 
-    def to_string(self, position: int, mode: StringMode) -> str:
+    def to_string(self, position, mode: StringMode) -> str:
         """
         Returns a string representation of the position based on the given mode.
         """
@@ -96,7 +97,7 @@ class Pancakes(Game):
         """
         return f'A_-_{move}_x'
 
-    def hash(self, widths: list[int], directions: list[int]) -> int:
+    def hash(self, widths, directions) -> int:
         h = 0
         n = self.height
         for i in range(n):
@@ -109,7 +110,7 @@ class Pancakes(Game):
         h = (h << n) | direction_hash
         return h
 
-    def unhash(self, position: int) -> tuple[list[int]]:
+    def unhash(self, position) -> tuple[list[int]]:
         width_arr = []
         direction_arr = []
         n = self.height
