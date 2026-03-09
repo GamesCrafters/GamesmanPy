@@ -1,6 +1,6 @@
 from models import Game, Value, StringMode
 from typing import Optional
-
+# marble_circuit
 # 口 0..3 = TL, TR, BR, BL
 TOP_LEFT, TOP_RIGHT, BOTTOM_RIGHT, BOTTOM_LEFT = 0, 1, 2, 3
 
@@ -91,6 +91,8 @@ class MarbleCircuit(Game):
     ]
     GOALS_CH1 = [(0, 0), (1, 1)]
     INIT_REM_CH1 = (1, 0)
+    PYRAMID_CONFIRM_MOVE = 50
+    PYRAMID_EMPTY = "□"
 
     def __init__(self, variant_id: str):
         if variant_id not in MarbleCircuit.variants:
@@ -102,7 +104,7 @@ class MarbleCircuit(Game):
             self.NUM_SLOTS = 10
             self.BOARD_TOPOLOGY = PYRAMID_10_TOPOLOGY_CORNERS
             self._board_max = 5 ** 10
-            self._rem_max = 4 * 4 * 4 * 4
+            self._rem_max = 4 * 4 * 4 * 4 * 2
         else:
             self.NUM_SLOTS = 4
             self.BOARD_TOPOLOGY = MarbleCircuit.BOARD_TOPOLOGY_2X2
@@ -125,7 +127,7 @@ class MarbleCircuit(Game):
             x //= self._base
         return board, rem_s, rem_L
 
-    def _decode_ch23(self, position: int) -> tuple[list[int], tuple[int, int, int, int]]:
+    def _decode_ch23(self, position: int) -> tuple[list[int], tuple[int, int, int, int], bool]:
         board_enc = position % self._board_max
         rem_enc = position // self._board_max
         board = []
@@ -133,11 +135,14 @@ class MarbleCircuit(Game):
         for _ in range(10):
             board.append(x % 5)
             x //= 5
+        confirmed = rem_enc >= 256
+        if confirmed:
+            rem_enc -= 256
         teal = rem_enc % 4
         orange = (rem_enc // 4) % 4
         yellow = (rem_enc // 16) % 4
         magenta = (rem_enc // 64) % 4
-        return board, (teal, orange, yellow, magenta)
+        return board, (teal, orange, yellow, magenta), confirmed
 
     def _encode(self, board, rem_s, rem_L=None) -> int:
         if self._is_pyramid:
@@ -148,10 +153,12 @@ class MarbleCircuit(Game):
             board_enc = board_enc * self._base + board[i]
         return board_enc + self._board_max * rem_enc
 
-    def _encode_ch23(self, board: list[int], rem: tuple[int, int, int, int]) -> int:
+    def _encode_ch23(self, board: list[int], rem: tuple[int, int, int, int], confirmed: bool = False) -> int:
         board_enc = sum(board[i] * (5 ** i) for i in range(10))
         teal, orange, yellow, magenta = rem
         rem_enc = teal + 4 * orange + 16 * yellow + 64 * magenta
+        if confirmed:
+            rem_enc += 256
         return board_enc + self._board_max * rem_enc
 
     def _get_block_paths(self, cell: int) -> list[tuple[int, int]]:
@@ -270,19 +277,19 @@ class MarbleCircuit(Game):
     def start(self) -> int:
         if self._is_pyramid:
             cfg = self._ch_config
-            return self._encode_ch23(list(cfg["init_board"]), cfg["init_rem"])
+            return self._encode_ch23(list(cfg["init_board"]), cfg["init_rem"], False)
         return self._encode([0] * self.NUM_SLOTS, self._init_rem[0], self._init_rem[1])
 
     PYRAMID_REMOVE_MOVE_BASE = 40  # place 0..39, remove 40+slot
 
     def generate_moves(self, position: int) -> list[int]:
         if self._is_pyramid:
-            board, (teal, orange, yellow, magenta) = self._decode_ch23(position)
+            board, (teal, orange, yellow, magenta), confirmed = self._decode_ch23(position)
+            if confirmed:
+                return []
             moves = []
             rem_all_zero = (teal == 0 and orange == 0 and yellow == 0 and magenta == 0)
             board_full = all(board[slot] != 0 for slot in range(10))
-            if board_full and rem_all_zero:
-                return []
             for slot in range(10):
                 if board[slot] == 0:
                     rem = [(1, teal), (2, orange), (3, yellow), (4, magenta)]
@@ -291,6 +298,8 @@ class MarbleCircuit(Game):
                             moves.append(slot * 4 + (btype - 1))
                 elif slot not in self._ch_config["fixed_slots"]:
                     moves.append(self.PYRAMID_REMOVE_MOVE_BASE + slot)
+            if board_full and rem_all_zero:
+                moves.append(self.PYRAMID_CONFIRM_MOVE)
             return moves
         board, rem_s, rem_L = self._decode(position)
         moves = []
@@ -307,8 +316,16 @@ class MarbleCircuit(Game):
 
     def do_move(self, position: int, move: int) -> int:
         if self._is_pyramid:
-            board, rem = self._decode_ch23(position)
+            board, rem, confirmed = self._decode_ch23(position)
+            if confirmed:
+                raise ValueError("Cannot move after confirmation")
             teal, orange, yellow, magenta = rem
+            if move == self.PYRAMID_CONFIRM_MOVE:
+                board_full = all(cell != 0 for cell in board)
+                rem_all_zero = (teal == 0 and orange == 0 and yellow == 0 and magenta == 0)
+                if not board_full or not rem_all_zero:
+                    raise ValueError("Can only confirm when board is full and no blocks remain")
+                return self._encode_ch23(board, (teal, orange, yellow, magenta), True)
             if move >= self.PYRAMID_REMOVE_MOVE_BASE:
                 slot = move - self.PYRAMID_REMOVE_MOVE_BASE
                 if slot in self._ch_config["fixed_slots"]:
@@ -324,7 +341,7 @@ class MarbleCircuit(Game):
                     yellow += 1
                 else:
                     magenta += 1
-                return self._encode_ch23(board, (teal, orange, yellow, magenta))
+                return self._encode_ch23(board, (teal, orange, yellow, magenta), False)
             slot = move // 4
             btype = (move % 4) + 1
             board = list(board)
@@ -337,7 +354,7 @@ class MarbleCircuit(Game):
                 yellow -= 1
             else:
                 magenta -= 1
-            return self._encode_ch23(board, (teal, orange, yellow, magenta))
+            return self._encode_ch23(board, (teal, orange, yellow, magenta), False)
         slot = move // 8
         rest = move % 8
         btype = rest // 4
@@ -353,8 +370,8 @@ class MarbleCircuit(Game):
 
     def primitive(self, position: int) -> Optional[Value]:
         if self._is_pyramid:
-            board, rem = self._decode_ch23(position)
-            if any(r > 0 for r in rem):
+            board, rem, confirmed = self._decode_ch23(position)
+            if (not confirmed) or any(r > 0 for r in rem):
                 return None
             return Value.Win if self._all_goals_met(board) else Value.Loss
         board, rem_s, rem_L = self._decode(position)
@@ -366,27 +383,60 @@ class MarbleCircuit(Game):
         """终局时返回出口计数与目标对比；非金字塔或未终局返回 None。"""
         if not self._is_pyramid:
             return None
-        board, rem = self._decode_ch23(position)
-        if any(r > 0 for r in rem):
+        board, rem, confirmed = self._decode_ch23(position)
+        if (not confirmed) or any(r > 0 for r in rem):
             return None
         counts = self._get_exit_counts_ch23(board)
         goal = list(self._ch_config["exit_counts"])
         if counts == goal:
             return f"Your exit counts: {counts}, goal: {goal}, success!"
-        port_name = ("TL", "TR", "BR", "BL")
-        lines = [f"Your exit counts: {counts}, goal: {goal}, failed."]
-        for ball_id, ex, path in self._trace_all_balls_ch23(board):
-            path_s = "→".join(f"{s}{port_name[p]}" for s, p in path)
-            ex_s = f"目标{ex+1}" if ex is not None else "未出口"
-            lines.append(f"  {ball_id}号球: {path_s} → {ex_s}")
-        return "\n".join(lines)
+        return f"Your exit counts: {counts}, goal: {goal}, failed."
+
+    def _piece_char(self, cell: int) -> str:
+        if cell == 1:
+            return "H"
+        if cell == 2:
+            return "\\"
+        if cell == 3:
+            return "y"
+        if cell == 4:
+            return "x"
+        return self.PYRAMID_EMPTY
 
     def to_string(self, position: int, mode: StringMode) -> str:
         if self._is_pyramid:
-            board, rem = self._decode_ch23(position)
-            s = " ".join(str(b) for b in board) + " | T%d O%d Y%d M%d" % rem
+            board, rem, confirmed = self._decode_ch23(position)
+            status = "CONFIRMED" if confirmed else "UNCONFIRMED"
+            board_chars = [self._piece_char(cell) for cell in board]
+            goal = list(self._ch_config["exit_counts"])
+            exits = self._get_exit_counts_ch23(board) if confirmed else [self.PYRAMID_EMPTY] * 5
+            goal_row = " ".join(f"{v:^4}" for v in goal)
+            exits_row = " ".join(f"{str(v):^4}" for v in exits)
+            legend = [
+                "Pieces:   H         \\         y         x",
+                "        || ||     \\\\//      \\\\//      \\\\//",
+                "        || ||       \\\\      //        //\\\\",
+            ]
+            rows = [
+                "          0",
+                "       1     2",
+                "    3     4     5",
+                "  6     7     8     9",
+                f"          {board_chars[0]}",
+                f"       {board_chars[1]}     {board_chars[2]}",
+                f"    {board_chars[3]}     {board_chars[4]}     {board_chars[5]}",
+                f"  {board_chars[6]}     {board_chars[7]}     {board_chars[8]}     {board_chars[9]}",
+                "",
+                goal_row,
+                exits_row,
+                f"remaining: H{rem[0]} \\{rem[1]} y{rem[2]} x{rem[3]}",
+                f"state: {status}",
+            ]
+            if not confirmed:
+                rows.insert(0, " o  o  o  o  o  o  o  o")
+            s = "\n".join(legend + [""] + rows)
             if mode == StringMode.AUTOGUI:
-                return "0_" + "".join(str(b) for b in board) + "_" + "_".join(str(r) for r in rem)
+                return "0_" + "".join(str(b) for b in board) + "_" + "_".join(str(r) for r in rem) + f"_{1 if confirmed else 0}"
             return s
         board, rem_s, rem_L = self._decode(position)
         lines = [f"[{board[0]}][{board[1]}]  rem: S={rem_s} L={rem_L}", f"[{board[2]}][{board[3]}]"]
@@ -404,10 +454,12 @@ class MarbleCircuit(Game):
             if len(parts) >= 5 and len(parts[0]) >= 10:
                 board = [int(c) for c in parts[0][:10]]
                 rem = tuple(int(parts[i]) for i in range(1, 5))
+                confirmed = (len(parts) >= 6 and parts[5] == "1")
             else:
                 board = list(self._ch_config["init_board"])
                 rem = self._ch_config["init_rem"]
-            return self._encode_ch23(board, rem)
+                confirmed = False
+            return self._encode_ch23(board, rem, confirmed)
         parts = s.split("_")
         if len(parts) >= 3 and len(parts[0]) >= 4:
             board = [int(c) for c in parts[0][:4]]
@@ -422,17 +474,22 @@ class MarbleCircuit(Game):
 
     def move_to_string(self, move: int, mode: StringMode) -> str:
         if self._is_pyramid:
+            if move == self.PYRAMID_CONFIRM_MOVE:
+                if mode == StringMode.AUTOGUI:
+                    return "C_x_x"
+                return "="
             if move >= self.PYRAMID_REMOVE_MOVE_BASE:
                 slot = move - self.PYRAMID_REMOVE_MOVE_BASE
                 if mode == StringMode.AUTOGUI:
                     return f"R_{slot}_x"
-                return f"({slot},-)"
+                return f"{slot}-"
             slot = move // 4
             k = move % 4
-            kind = ("T", "O", "Y", "M")[k]
+            kind = ("H", "\\", "y", "x")[k]
             if mode == StringMode.AUTOGUI:
-                return f"M_{slot}_{kind}_x"
-            return f"({slot},{kind})"
+                kind_auto = ("T", "O", "Y", "M")[k]
+                return f"M_{slot}_{kind_auto}_x"
+            return f"{slot}{kind}"
         slot = move // 8
         rest = move % 8
         btype = rest // 4
