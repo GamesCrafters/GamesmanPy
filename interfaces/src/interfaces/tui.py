@@ -13,9 +13,10 @@ class TUI:
 
     def play(self, game: Game, variant: str):
         import sqlite3
-        db = SqliteDB(game.id, variant)
         use_db = True
+        db = None
         try:
+            db = SqliteDB(game.id, variant)
             _ = db.get(game.start())
         except sqlite3.OperationalError:
             use_db = False
@@ -72,14 +73,18 @@ class TUI:
         return game.move_to_string(move, StringMode.Readable)
     
     def get_valid_move(self, moves: list[str]) -> str:
+        moves = list(moves)
+        lower_map = {move.lower(): move for move in moves}
         user_input = input("Select a move: ")
         if user_input == 'q':
             exit()
-        while user_input not in moves:
+        while user_input not in moves and user_input.lower() not in lower_map:
             user_input = input("Invalid move. Please select a valid move: ")
             if user_input == 'q':
                 exit()
-        return user_input
+        if user_input in moves:
+            return user_input
+        return lower_map[user_input.lower()]
     
     def select_game(self) -> Game:
         print(f'Games: {', '.join(game_list.keys())}')
