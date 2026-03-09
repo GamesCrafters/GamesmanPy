@@ -1,4 +1,4 @@
-from models import Game, Value, StringMode
+from models import Game, Value, StringMode, MoveValue
 from collections import defaultdict
 from typing import Optional
 
@@ -7,6 +7,7 @@ class ChipsChallenge(Game):
     variants = ["1"]
     n_players = 1
     cyclic = True
+    overrideMoveValue = True
 
     def __init__(self, variant_id: str):
         """
@@ -61,7 +62,7 @@ class ChipsChallenge(Game):
         return "".join(reversed(result))
     
     def to_number_string(self, string):
-        string = string.replace("p", " ")
+        string = string.replace("p", " ").replace(".", " ")
         bits = []
         for idx in range(self.row_size*self.column_size):
             if self.starting_pos[idx] not in " W":
@@ -146,7 +147,7 @@ class ChipsChallenge(Game):
         """
         if mode == StringMode.Readable:
             board = [position[idx*self.row_size:idx*self.row_size + self.row_size] for idx in range(self.column_size)]
-            return "".join(board)
+            return "".join(board).replace(" ", ".")
         elif mode == StringMode.TUI:
             board = [position[idx*self.row_size:idx*self.row_size + self.row_size] for idx in range(self.column_size)]
             return "\n".join(board)
@@ -173,8 +174,8 @@ class ChipsChallenge(Game):
     
     def generate_single_move(self, position, mode = StringMode.Readable):
         moves = []
-        position = position + (self.column_size*self.row_size - len(position))*" "
         p = position.find("p")
+        position = position + "."*(self.column_size*self.row_size - len(position))
         player_pos = (p % self.row_size, p // self.row_size)
         
         board = [[position[idx*self.row_size + r] for r in range(self.row_size)] for idx in range(self.column_size)]
@@ -186,7 +187,7 @@ class ChipsChallenge(Game):
             new_pos = new_x + new_y*self.row_size
             if 0 <= new_x and new_x < self.row_size and 0 <= new_y and new_y < self.column_size:
                 piece = position[new_pos]
-                if piece in self.obtainables or piece == " ":
+                if piece in self.obtainables or piece == ".":
                     if mode == StringMode.AUTOGUI:
                         moves.append(f"A_-_{new_pos}_x")
                     else:
@@ -211,4 +212,56 @@ class ChipsChallenge(Game):
             p = position.find("p")
             player_pos = (p % self.row_size, p // self.row_size)
             dx, dy = self.keybindings[move]
-            return self.do_move(position, tuple([player_pos[0] + dx, player_pos[1] + dy]))
+            return self.do_move(position, tuple([player_pos[0] + dx, player_pos[1] + dy])).replace(" ", ".")
+
+
+    def bfs_helper(self, board, start, targets):
+
+        queue = [start]
+        visited = set()
+        best = -1
+        while queue:
+            curr = queue.pop()
+            curr_pos = (curr[0], curr[1])
+            if curr_pos not in visited:
+                visited.add(curr_pos)
+                piece = board[curr[1]][curr[0]]
+                if piece == "W":
+                    continue
+                elif curr_pos in targets:
+                    return curr[2]
+                for dx, dy in self.dxdy:
+                    new_x = curr[0] + dx
+                    new_y = curr[1] + dy
+                    if 0 <= new_x and new_x < self.row_size and 0 <= new_y and new_y < self.column_size:
+                        queue = [tuple([new_x, new_y, curr[2] + 1])] + queue
+
+        return best
+
+
+    def get_move_value(self, position, move, hash_change_moves):
+
+        for target in (Value.Win, Value.Tie, Value.Loss):
+            filtered = [item for item in hash_change_moves if item[2] == target]
+            if filtered:
+                min_val = min(item[1] for item in filtered)
+                targets = [item[0] for item in filtered if item[1] == min_val]
+                break
+
+        position = position + "."*(self.column_size*self.row_size - len(position))
+        board = [[position[idx*self.row_size + r] for r in range(self.row_size)] for idx in range(self.column_size)]
+
+        p = position.find("p")
+        player_pos = (p % self.row_size, p // self.row_size, 0)
+
+        new_p = int(move.split("_")[2])
+        new_pos = (new_p % self.row_size, new_p // self.row_size, 0)
+
+        best_orig = self.bfs_helper(board, player_pos, targets)
+        best_new = self.bfs_helper(board, new_pos, targets)
+        if best_new < best_orig:
+            return MoveValue.WIN
+        elif best_new > best_orig:
+            return MoveValue.LOSE
+        else:
+            return MoveValue.TIE

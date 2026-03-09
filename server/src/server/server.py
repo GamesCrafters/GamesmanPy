@@ -47,9 +47,24 @@ def get_pos(game_id: str, variant_id: str):
     if entry is None:
         abort(404, "Position not in database.")
     (rem, val) = entry
+
     moves = []
+    hash_change_moves = []
+
     if game.primitive(pos) is None:
         moves =  game.generate_single_move(pos, StringMode.AUTOGUI)
+        hash_change_moves = game.generate_moves(pos)
+    
+    if hasattr(game, "overrideMoveValue"):
+        hash_change_move_vals = []
+        for new_move in hash_change_moves:
+            hash_change_pos = game.do_move(pos, new_move)
+            new_pos_hash = game.hash_ext(hash_change_pos)
+            new_child = db.get(new_pos_hash)
+            if new_child is not None:
+                (child_rem, child_val) = new_child
+                hash_change_move_vals.append(tuple([new_move, child_rem, child_val]))
+
     move_objs = []
     for move in moves:
         new_pos = game.resolve_move(pos, move)
@@ -57,14 +72,18 @@ def get_pos(game_id: str, variant_id: str):
         child = db.get(new_hashed_pos)
         if child is not None:
             (child_rem, child_val) = child
-            move_objs.append({
+            item = {
                 "position": game.to_string(new_pos, StringMode.Readable),
                 "autoguiPosition": game.to_string(new_pos, StringMode.AUTOGUI),
                 "positionValue": value_to_string(child_val),
                 "move": game.move_to_string(move, StringMode.Readable),
                 "autoguiMove": game.move_to_string(move, StringMode.AUTOGUI),
                 "remoteness": child_rem,
-            })
+            }
+
+            if hasattr(game, "overrideMoveValue"):
+                item["moveValue"] = game.get_move_value(pos, item["autoguiMove"], hash_change_move_vals)
+            move_objs.append(item)
     response = {
         'position': stringpos,
         'autoguiPosition': game.to_string(pos, StringMode.AUTOGUI),
