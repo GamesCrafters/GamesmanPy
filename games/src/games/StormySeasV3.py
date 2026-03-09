@@ -15,7 +15,7 @@ class StormySeas(Game):
         if variant_id not in StormySeas.variants:
             raise ValueError("Variant not defined")
         self._variant_id = variant_id
-        board_rows = []
+        self.board_rows = []
 
     def start(self) -> int:
         if self._variant_id == "a":
@@ -28,12 +28,22 @@ class StormySeas(Game):
             return hash
         elif self._variant_id == "b":
             # Add variant b starting position
-            string_rep = "010101111001011101010110110010101110010101110001011101000011011011110111001123238221142"
-            return self.hash(string_rep)
+            self.board_rows = ["101011100","101110100","101101100","101011100","101011100","101110100","110110100","111011100"]
+
+            # use ternary digits to represent shifts?
+            curr_shift_string = "11000020"
+            boat_pos = "123256227142" # first two digits are location, third digit is direction (1 = up, 2 = right, 3 = down, 4 = left), last digit is length
+            hash = self.hash(curr_shift_string + boat_pos)
+            return hash
         elif self._variant_id == "c":
             # Add variant c starting position
-            string_rep = "010101111001011101010110110010101110010101110001011101000011011011110111001123238221142"
-            return self.hash(string_rep)
+            self.board_rows = ["101011100","101110100","101101100","101011100","101011100","101110100","110110100","111011100"]
+
+            # use ternary digits to represent shifts?
+            curr_shift_string = "11000020"
+            boat_pos = "123256227142" # first two digits are location, third digit is direction (1 = up, 2 = right, 3 = down, 4 = left), last digit is length
+            hash = self.hash(curr_shift_string + boat_pos)
+            return hash
         
         return 0
     
