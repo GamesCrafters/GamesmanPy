@@ -146,6 +146,9 @@ class ChipsChallenge(Game):
         """
         if mode == StringMode.Readable:
             board = [position[idx*self.row_size:idx*self.row_size + self.row_size] for idx in range(self.column_size)]
+            return "".join(board)
+        elif mode == StringMode.TUI:
+            board = [position[idx*self.row_size:idx*self.row_size + self.row_size] for idx in range(self.column_size)]
             return "\n".join(board)
         else:
             position = position + (self.column_size*self.row_size - len(position))*" "
