@@ -7,7 +7,6 @@ class ChipsChallenge(Game):
     variants = ["1"]
     n_players = 1
     cyclic = True
-    overrideMoveValue = True
 
     def __init__(self, variant_id: str):
         """
@@ -112,11 +111,11 @@ class ChipsChallenge(Game):
                 if piece == "W":
                     continue
                 elif piece in self.obtainables:
-                    moves.append(curr)
+                    moves.append(tuple([p, curr]))
                     continue
                 elif piece in self.blocking_pieces:
                     if item_dict[piece] > 0:
-                        moves.append(curr)
+                        moves.append(tuple([p, curr]))
                     continue
                 for dx, dy in self.dxdy:
                     new_x = curr[0] + dx
@@ -129,8 +128,9 @@ class ChipsChallenge(Game):
         """
         Returns the resulting position of applying move to position.
         """
-        p = position.find("p")
-        idx = move[0]+move[1]*self.row_size
+        m = move[1]
+        p = move[0]
+        idx = m[0]+m[1]*self.row_size
         new_pos = position[0:p] + " " + position[p+1::]
         new_pos = new_pos[0:idx] + "p" + new_pos[idx+1::]
         return new_pos
@@ -150,7 +150,7 @@ class ChipsChallenge(Game):
             return "".join(board).replace(" ", ".")
         elif mode == StringMode.TUI:
             board = [position[idx*self.row_size:idx*self.row_size + self.row_size] for idx in range(self.column_size)]
-            return "\n".join(board)
+            return "\n".join(board).replace(".", " ")
         else:
             position = position + (self.column_size*self.row_size - len(position))*" "
             return "1_" + position.replace(' ', '-') 
@@ -167,101 +167,11 @@ class ChipsChallenge(Game):
         """
         Returns a string representation of the move based on the given mode.
         """
-        return move
+        if mode == StringMode.AUTOGUI:
+            m = move[1]
+            idx = m[0]+m[1]*self.row_size
+            return f"M_{move[0]}_{idx}_x"
+        return str(move[1])
     
     def hash_ext(self, position):
         return int(self.to_number_string(position), base=2)
-    
-    def generate_single_move(self, position, mode = StringMode.Readable):
-        moves = []
-        p = position.find("p")
-        position = position + "."*(self.column_size*self.row_size - len(position))
-        player_pos = (p % self.row_size, p // self.row_size)
-        
-        board = [[position[idx*self.row_size + r] for r in range(self.row_size)] for idx in range(self.column_size)]
-
-        item_dict = self.get_item_dict(board)
-        for dx, dy in self.dxdy:
-            new_x = player_pos[0] + dx
-            new_y = player_pos[1] + dy
-            new_pos = new_x + new_y*self.row_size
-            if 0 <= new_x and new_x < self.row_size and 0 <= new_y and new_y < self.column_size:
-                piece = position[new_pos]
-                if piece in self.obtainables or piece == ".":
-                    if mode == StringMode.AUTOGUI:
-                        moves.append(f"A_-_{new_pos}_x")
-                    else:
-                        moves.append(tuple([dx, dy]))
-                elif piece in self.blocking_pieces:
-                    if item_dict[piece] > 0:
-                        if mode == StringMode.AUTOGUI:
-                            moves.append(f"A_-_{new_pos}_x")
-                        else:
-                            moves.append(tuple([dx, dy]))
-
-        if mode == StringMode.AUTOGUI:
-            return moves
-        
-        return [self.key_maps[move] for move in moves]
-    
-    def resolve_move(self, position, move):
-        if type(move) == str and move[0] == "A":
-            new_p = int(move.split("_")[2])
-            return self.do_move(position, (new_p % self.row_size, new_p // self.row_size))
-        else:
-            p = position.find("p")
-            player_pos = (p % self.row_size, p // self.row_size)
-            dx, dy = self.keybindings[move]
-            return self.do_move(position, tuple([player_pos[0] + dx, player_pos[1] + dy])).replace(" ", ".")
-
-
-    def bfs_helper(self, board, start, targets):
-
-        queue = [start]
-        visited = set()
-        best = -1
-        while queue:
-            curr = queue.pop()
-            curr_pos = (curr[0], curr[1])
-            if curr_pos not in visited:
-                visited.add(curr_pos)
-                piece = board[curr[1]][curr[0]]
-                if piece == "W":
-                    continue
-                elif curr_pos in targets:
-                    return curr[2]
-                for dx, dy in self.dxdy:
-                    new_x = curr[0] + dx
-                    new_y = curr[1] + dy
-                    if 0 <= new_x and new_x < self.row_size and 0 <= new_y and new_y < self.column_size:
-                        queue = [tuple([new_x, new_y, curr[2] + 1])] + queue
-
-        return best
-
-
-    def get_move_value(self, position, move, hash_change_moves):
-
-        for target in (Value.Win, Value.Tie, Value.Loss):
-            filtered = [item for item in hash_change_moves if item[2] == target]
-            if filtered:
-                min_val = min(item[1] for item in filtered)
-                targets = [item[0] for item in filtered if item[1] == min_val]
-                break
-
-        position = position + "."*(self.column_size*self.row_size - len(position))
-        board = [[position[idx*self.row_size + r] for r in range(self.row_size)] for idx in range(self.column_size)]
-
-        p = position.find("p")
-        player_pos = (p % self.row_size, p // self.row_size, 0)
-
-        new_p = int(move.split("_")[2])
-        new_pos = (new_p % self.row_size, new_p // self.row_size, 0)
-
-        best_orig = self.bfs_helper(board, player_pos, targets)
-        best_new = self.bfs_helper(board, new_pos, targets)
-        if best_new < best_orig:
-            return MoveValue.WIN
-        elif best_new > best_orig:
-            return MoveValue.LOSE
-        else:
-            return MoveValue.TIE

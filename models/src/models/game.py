@@ -63,16 +63,3 @@ class Game(ABC):
     
     def unhash_ext(self, hashed_pos) -> int:
         return hashed_pos
-    
-    def generate_single_move(self, position, mode: StringMode = StringMode.Readable):
-        return self.generate_moves(position)
-    
-    def resolve_move(self, position, move):
-        return self.do_move(position, move)
-
-    def get_move_value(self, position, move, hash_change_moves):
-        """
-        Given Autogui Move and Position, return if the move is Value.WIN, Value.LOSE, or Value.TIE
-        Is not required by default, only required when multipart moves with same hashes exist (i.e. Chip's Challenge, Sokoban)
-        """
-        return None
