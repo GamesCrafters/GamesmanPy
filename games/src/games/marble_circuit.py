@@ -76,9 +76,9 @@ PYRAMID_10_TOPOLOGY: list[list[tuple[int, int] | tuple[str, int] | None]] = [
 
 
 class MarbleCircuit(Game):
-    """2x2_ch1：4 槽可旋转。ch23/ch46/…：10 槽金字塔、4 种块不可旋转、按出口计数判胜。"""
+    """Marble Circuit：10 槽金字塔、4 种块不可旋转、按出口计数判胜（ch23/ch46/…）。"""
     id = "marble_circuit"
-    variants = ["2x2_ch1", "ch23", "ch46"]
+    variants = ["ch23", "ch46"]
     n_players = 1
     cyclic = True
 

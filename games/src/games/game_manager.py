@@ -28,4 +28,3 @@ def get_game(game_id: str, variant_id: str=None) -> Result[Game, str]:
     if variant_id is not None and variant_id not in game.variants:
         return Err("Invalid variant ID")
     return Ok(game)
-    
