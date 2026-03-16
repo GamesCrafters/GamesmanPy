@@ -51,6 +51,8 @@ class LunarLockout(Game):
             self._move_down:  ( 1, 0),
             self._move_left:  ( 0, -1),
         }
+        self._last_src = 0
+        self._last_dest = 0 
 
 
     # Select starting squares for all robots with no duplicates.
@@ -100,10 +102,10 @@ class LunarLockout(Game):
                 continue
 
             for direction in range(4):
-                move = robot_index * 4 + direction
+                dest, _ = self._slide(robots, robot_index, direction)
 
-                if self.do_move(position, move) != position:
-                    moves.append(move)
+                if dest != robots[robot_index]:
+                    moves.append(robot_index * 4 + direction)
 
         return moves
 
@@ -128,32 +130,19 @@ class LunarLockout(Game):
         if robots[robot_index] == self._removed:
             return position
 
-        row = robots[robot_index] // self._cols
-        col = robots[robot_index] % self._cols
+        src = robots[robot_index]
 
-        step_row, step_col = self._directions[direction]
+        dest, left_board = self._slide(robots, robot_index, direction)
 
-        while True:
-            next_row = row + step_row
-            next_col = col + step_col
+        if left_board:
+            robots[robot_index] = self._removed
+        else:
+            robots[robot_index] = dest
 
-            if not (0 <= next_row < self._rows and 0 <= next_col < self._cols):
-                robots[robot_index] = self._removed
-                break
-
-            next_cell = next_row * self._cols + next_col
-
-            if next_cell in robots and next_cell != robots[robot_index]:
-                break
-
-            row = next_row
-            col = next_col
-
-        if robots[robot_index] != self._removed:
-            robots[robot_index] = row * self._cols + col
+        self._last_src = src
+        self._last_dest = dest
 
         return self.pack(robots)
-
 
     # Decode the state.
     # Return Win if the red robot occupies the center square (12).
@@ -185,22 +174,22 @@ class LunarLockout(Game):
         """ 
         robot_positions = self.unpack(position)
 
-        board = [["." for _ in range(5)] for _ in range(5)]
-        board[2][2] = "x"
-        symbols = ["0", "1", "2", "3", "4"]     
+        board = [["." for _ in range(self._cols)] for _ in range(self._rows)]
 
-        for index, position in enumerate(robot_positions):
-            if position == 31:
+        symbols = ["0","1","2","3","4"]
+
+        for i, p in enumerate(robot_positions):
+            if p == self._removed:
                 continue
-            row = position // 5
-            col = position % 5
-            board[row][col] = symbols[index]    
+
+            row = p // self._cols
+            col = p % self._cols
+            board[row][col] = symbols[i]
 
         if mode == StringMode.AUTOGUI:
-            return "".join(" ".join(row) for row in board)
-            
-        return "\n".join(" ".join(row) for row in board)
+            return "1_" + "".join("".join(r) for r in board)
 
+        return "\n".join(" ".join(r) for r in board)
 
     # Parse a readable board layout into robot positions.
     # Validate positions are within bounds and not duplicated.
@@ -208,23 +197,19 @@ class LunarLockout(Game):
     # Encode the positions into an integer state.
     def from_string(self, strposition: str) -> int:
         """
-        Returns the position from a string representation of the position.
-        Input string is StringMode.Readable.
+        Converts a readable board string into the encoded state.
         """
         strposition = strposition.replace("\\n", "\n")
-
-        lines = strposition.strip().split("\n")
+        board = strposition.replace(" ", "").replace("\n", "")
 
         robots = [self._removed] * self._robot_count
 
-        for r, line in enumerate(lines):
-            cells = line.split()
-
-            for c, cell in enumerate(cells):
-                if cell in ["0","1","2","3","4"]:
-                    robots[int(cell)] = r * 5 + c
+        for i, cell in enumerate(board):
+            if cell in ["0","1","2","3","4"]:
+                robots[int(cell)] = i
 
         return self.pack(robots)
+
 
     # Decode the move into robot index and direction.
     # Return a readable description of the movement direction.
@@ -236,17 +221,16 @@ class LunarLockout(Game):
         direction = move % 4
 
         directions = ["u", "r", "d", "l"]
-        name = str(robot)
 
-        return f"{name} {directions[direction]}"
-
+        # if mode == StringMode.AUTOGUI:
+        #     return f"M_{self._last_src}_{self._last_dest}"
+        if mode == StringMode.AUTOGUI:
+            if self._last_dest == self._removed:
+                return f"M_{self._last_src}_x"
+        return f"M_{self._last_src}_{self._last_dest}"
+        
+        return f"{robot} {directions[direction]}"
     
-    # Helper responsibilities:
-    # Provide pack and unpack functions converting between the integer state and the five robot positions.
-    # Pack and unpack must be exact inverses and produce a single canonical representation of every board state.
-    # Convert between index and (row, column) coordinates.
-    # Provide stepping logic for movement along rows and columns.
-    # Provide alignment checks for same-row and same-column detection.
 
     def pack(self, robots: list[int]) -> int:
         """
@@ -292,3 +276,37 @@ class LunarLockout(Game):
             robots[i] = state & self._mask  # get last 5 bits
             state >>= self._bits_per_robot  # discard those bits
         return robots
+
+
+    def _slide(self, robots: list[int], robot_index: int, direction: int):
+        src = robots[robot_index]
+
+        row = src // self._cols
+        col = src % self._cols
+
+        step_row, step_col = self._directions[direction]
+
+        last_row = row
+        last_col = col
+        left_board = False
+
+        while True:
+            next_row = row + step_row
+            next_col = col + step_col
+
+            if not (0 <= next_row < self._rows and 0 <= next_col < self._cols):
+                left_board = True
+                break
+
+            next_cell = next_row * self._cols + next_col
+
+            if next_cell in robots and next_cell != src:
+                break
+
+            last_row = next_row
+            last_col = next_col
+            row = next_row
+            col = next_col
+
+        dest = last_row * self._cols + last_col
+        return dest, left_board
