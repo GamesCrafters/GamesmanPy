@@ -1,123 +1,88 @@
-"""
-Flow Free – 5×5 puzzle for GamesmanPuzzles
-===========================================
-
-SETUP INSTRUCTIONS
-------------------
-1. Copy this file to:  games/src/games/flowfree.py
-
-2. In games/src/games/game_manager.py, add:
-       from games.flowfree import FlowFree
-   and append  FlowFree  to  game_list.
-
-3. Solve from the project root:
-       uv run solver flowfree          # all variants
-       uv run solver flowfree -v a     # specific variant
-       uv run solver flowfree -v a -o  # overwrite existing database
-
-BOARD
------
-  5×5 grid, cells indexed 0-24  (cell = row * 5 + col)
-  Colors  1-5  (0 = empty)
-
-  Variant a (easy)      Variant b (medium)    Variant c (hard)
-  R . B . R             R . B . G             R G . B .
-  G . . M .             . Y . . .             Y . . . .
-  Y . . . G             . M . M .             M . . . M
-  . M . . .             . . . Y .             . . . . Y
-  . . B . Y             R . B . G             . B . G R
-
-STATE ENCODING  (single integer, fully reversible)
---------------------------------------------------
-  hash(board, active_color, active_head)
-
-  board        : 25 base-6 digits packed into an integer
-                 board[i] in {0..5}, digit weight = 6^i
-  active_color : which color is currently being drawn (0 = none)
-                 stored in digit position 25  -> multiplied by 6^25
-  active_head  : cell index of the path's current tip (NO_HEAD=25 if none)
-                 stored in digit position 26  -> multiplied by 6^26
-
-MOVES  (integer 0-24 = cell the player taps)
---------------------------------------------
-  No active path -> tap any dot cell to start drawing that color
-  Active path    -> tap an adjacent empty cell to extend the path
-                    tap the partner dot to complete and lock the path
-"""
-
 from models import Game, Value, StringMode
 from typing import Optional
+
 # ── Constants ────────────────────────────────────────────────────────────────
 
 SIZE    = 5
-NCELLS  = SIZE * SIZE      # 25
-BASE    = 6                # colors 1-5 plus 0 (empty)
-NO_HEAD = NCELLS           # sentinel: 25 means "no path in progress"
+NCELLS  = SIZE * SIZE  # 25
+BASE    = 6            # colors 1-5 plus 0 (empty)
+NO_HEAD = NCELLS       # sentinel: 25 = no path in progress
 
 COLOR_NAMES = {0: ".", 1: "R", 2: "G", 3: "B", 4: "Y", 5: "M"}
 
 # ── Puzzle layouts ────────────────────────────────────────────────────────────
 # {cell_index: color_id}  — only the fixed dot endpoints are listed.
 
+# Each puzzle is verified to have a valid board-filling solution.
+#
+# Variant a:       Variant b:       Variant c:
+#   R G . . B        R G . . B        R . . . .
+#   . . Y . .        . Y . . M        G Y M . .
+#   M R . . .        . . G . .        . . B . .
+#   . Y . . .        . . Y . .        . Y . M .
+#   . . M G B        . . R B M        . G . B R
+#
 PUZZLES = {
-    "a": {                  # easy
-         0: 1,  4: 1,       # Red
-         5: 2, 14: 2,       # Green
-         2: 3, 22: 3,       # Blue
-        10: 4, 24: 4,       # Yellow
-         8: 5, 16: 5,       # Maroon
-    },
-    "b": {                  # medium
-         0: 1, 20: 1,       # Red
-         4: 2, 24: 2,       # Green
-         2: 3, 22: 3,       # Blue
-         6: 4, 18: 4,       # Yellow
-        11: 5, 13: 5,       # Maroon
-    },
-    "c": {                  # hard
-         0: 1, 24: 1,       # Red   (opposite corners)
+    "a": {
+         0: 1, 11: 1,       # Red
          1: 2, 23: 2,       # Green
-         3: 3, 21: 3,       # Blue
-         5: 4, 19: 4,       # Yellow
-        10: 5, 14: 5,       # Maroon
+         4: 3, 24: 3,       # Blue
+         7: 4, 16: 4,       # Yellow
+        10: 5, 22: 5,       # Maroon
+    },
+    "b": {
+         0: 1, 22: 1,       # Red
+         1: 2, 12: 2,       # Green
+         4: 3, 23: 3,       # Blue
+         6: 4, 17: 4,       # Yellow
+         9: 5, 24: 5,       # Maroon
+    },
+    "c": {
+         0: 1, 24: 1,       # Red
+         5: 2, 21: 2,       # Green
+        12: 3, 23: 3,       # Blue
+         6: 4, 16: 4,       # Yellow
+         7: 5, 18: 5,       # Maroon
     },
 }
+
+# Precomputed neighbor lists
+_NEIGHBORS: list[list[int]] = []
+for _cell in range(NCELLS):
+    _r, _c = divmod(_cell, SIZE)
+    _nb = []
+    if _r > 0:        _nb.append((_r - 1) * SIZE + _c)
+    if _r < SIZE - 1: _nb.append((_r + 1) * SIZE + _c)
+    if _c > 0:        _nb.append(_r * SIZE + _c - 1)
+    if _c < SIZE - 1: _nb.append(_r * SIZE + _c + 1)
+    _NEIGHBORS.append(_nb)
 
 
 # ── Module-level helpers ──────────────────────────────────────────────────────
 
-def _neighbors(cell: int) -> list[int]:
-    """ since flow free is constricted with moves (horizontal or vertical no diagnol or overlap) need to nReturn valid neighbor cell indices for a given cell."""
-    r, c = divmod(cell, SIZE)
-    result = []
-    if r > 0:        result.append((r - 1) * SIZE + c)
-    if r < SIZE - 1: result.append((r + 1) * SIZE + c)
-    if c > 0:        result.append(r * SIZE + c - 1)
-    if c < SIZE - 1: result.append(r * SIZE + c + 1)
-    return result
+def _color_connected(board: list[int], start: int, goal: int, color: int) -> bool:
+    """Return True if start and goal are BFS-connected through same-colored cells."""
+    visited, queue = {start}, [start]
+    while queue:
+        cur = queue.pop()
+        if cur == goal:
+            return True
+        for nb in _NEIGHBORS[cur]:
+            if nb not in visited and board[nb] == color:
+                visited.add(nb)
+                queue.append(nb)
+    return False
 
 
 def _all_connected(board: list[int], dots: dict) -> bool:
     """Return True if every color's two dot endpoints are BFS-connected."""
-    seen_colors = set()
+    seen: set[int] = set()
     for cell, color in dots.items():
-        if color in seen_colors:
+        if color in seen:
             continue
-        seen_colors.add(color)
+        seen.add(color)
         endpoints = [c for c, v in dots.items() if v == color]
-        start, goal = endpoints[0], endpoints[1]
-        visited, queue = {start}, [start]
-        found = False
-        while queue:
-            cur = queue.pop()
-            if cur == goal:
-                found = True
-                break
-            for nb in _neighbors(cur):
-                if nb not in visited and board[nb] == color:
-                    visited.add(nb)
-                    queue.append(nb)
-        if not found:
+        if not _color_connected(board, endpoints[0], endpoints[1], color):
             return False
     return True
 
@@ -125,7 +90,7 @@ def _all_connected(board: list[int], dots: dict) -> bool:
 # ── Game class ────────────────────────────────────────────────────────────────
 
 class FlowFree(Game):
-    id        = "theflow"
+    id        = "flowfree"
     variants  = ["a", "b", "c"]
     n_players = 1
     cyclic    = False
@@ -133,40 +98,39 @@ class FlowFree(Game):
     def __init__(self, variant_id: str):
         if variant_id not in FlowFree.variants:
             raise ValueError(f"Unknown variant '{variant_id}'. Choose from {FlowFree.variants}.")
-        self._variant_id    = variant_id
-        self._dots          = PUZZLES[variant_id]        # {cell: color}
-        self._dot_set       = set(self._dots.keys())     # fast membership test
-        self._non_dot_cells = sorted(set(range(NCELLS)) - self._dot_set)  # 15 cells
+        self._dots          = PUZZLES[variant_id]
+        self._dot_set       = set(self._dots)
+        self._non_dot_cells = sorted(set(range(NCELLS)) - self._dot_set)
         n                   = len(self._non_dot_cells)
-        self._B_N           = BASE ** n        # multiplier for active_color slot
-        self._B_N1          = self._B_N * BASE # multiplier for active_head slot
+        self._B_N           = BASE ** n            # weight for active_color
+        self._B_N1          = self._B_N * BASE     # weight for active_head
+        self._B_N2          = self._B_N1 * (NCELLS + 1)  # weight for starting_dot
+        ep: dict[int, list[int]] = {}
+        for cell, color in self._dots.items():
+            ep.setdefault(color, []).append(cell)
+        self._color_endpoints = {c: (cells[0], cells[1]) for c, cells in ep.items()}
 
-    # ── hash / unhash  (recommended helpers) ─────────────────────────────────
+    # ── hash / unhash ─────────────────────────────────────────────────────────
+    # State = (board, active_color, active_head, starting_dot)
+    # starting_dot tracks which endpoint we began drawing from, so we can
+    # correctly identify the partner endpoint for path completion.
+    # Max hash ≈ 1.9e15, well within SQLite's 64-bit INTEGER range.
 
-    def hash(self, board: list[int], active_color: int, active_head: int) -> int:
-        """
-        Pack (board, active_color, active_head) into a single integer.
-
-        Only non-dot cells are encoded (dot cells are always their fixed color).
-        non_dot_cells[j] occupies digit j in base-6  (weight = 6^j).
-        active_color occupies the next digit  (weight = 6^15).
-        active_head  occupies the next digit  (weight = 6^16).
-        Max value ≈ 7.3e13, well within SQLite's 64-bit INTEGER range.
-        """
+    def hash(self, board: list[int], active_color: int,
+             active_head: int, starting_dot: int) -> int:
         n = 0
         for i in range(len(self._non_dot_cells) - 1, -1, -1):
             n = n * BASE + board[self._non_dot_cells[i]]
-        n += active_color * self._B_N
-        n += active_head  * self._B_N1
+        n += active_color  * self._B_N
+        n += active_head   * self._B_N1
+        n += starting_dot  * self._B_N2
         return n
 
-    def unhash(self, position: int) -> tuple[list[int], int, int]:
-        """
-        Unpack an integer position back to (board, active_color, active_head).
-        Inverse of hash().
-        """
-        active_head  = position // self._B_N1
-        rest         = position  % self._B_N1
+    def unhash(self, position: int) -> tuple[list[int], int, int, int]:
+        starting_dot = position // self._B_N2
+        rest         = position  % self._B_N2
+        active_head  = rest // self._B_N1
+        rest         = rest  % self._B_N1
         active_color = rest // self._B_N
         rest         = rest  % self._B_N
         board = [0] * NCELLS
@@ -175,45 +139,40 @@ class FlowFree(Game):
         for cell in self._non_dot_cells:
             board[cell] = rest % BASE
             rest //= BASE
-        return board, active_color, active_head
+        return board, active_color, active_head, starting_dot
 
     # ── start ─────────────────────────────────────────────────────────────────
 
     def start(self) -> int:
-        """Return the starting position: dot endpoints placed, no active path."""
         board = [0] * NCELLS
         for cell, color in self._dots.items():
             board[cell] = color
-        return self.hash(board, 0, NO_HEAD)
+        return self.hash(board, 0, NO_HEAD, NO_HEAD)
 
     # ── generate_moves ────────────────────────────────────────────────────────
 
     def generate_moves(self, position: int) -> list[int]:
         """
-        Return a list of valid cell indices (0-24) the player may tap.
-
-        No active path  ->  any dot cell starts a new path for that color.
-        Active path     ->  adjacent empty cells extend the path;
-                            the partner dot completes and locks it.
+        No active path  ->  tap any dot whose color is not yet connected.
+        Active path     ->  tap an adjacent empty cell, or the partner dot
+                            (the endpoint that is NOT the starting dot).
         """
-        board, active_color, active_head = self.unhash(position)
+        board, active_color, active_head, starting_dot = self.unhash(position)
         moves = []
 
         if active_color == 0:
-            # Between paths: player picks any dot to begin drawing
             for cell in self._dot_set:
-                moves.append(cell)
+                color = self._dots[cell]
+                ep1, ep2 = self._color_endpoints[color]
+                if not _color_connected(board, ep1, ep2, color):
+                    moves.append(cell)
         else:
-            # Mid-draw: only moves adjacent to the current head
-            for nb in _neighbors(active_head):
-                nb_val = board[nb]
-                if nb_val == 0:
-                    # Empty cell — valid extension
+            ep1, ep2 = self._color_endpoints[active_color]
+            partner = ep2 if starting_dot == ep1 else ep1
+            for nb in _NEIGHBORS[active_head]:
+                if board[nb] == 0:
                     moves.append(nb)
-                elif (nb in self._dot_set
-                      and self._dots[nb] == active_color
-                      and nb != active_head):
-                    # Partner dot — valid completion
+                elif nb == partner:
                     moves.append(nb)
 
         return moves
@@ -221,68 +180,41 @@ class FlowFree(Game):
     # ── do_move ───────────────────────────────────────────────────────────────
 
     def do_move(self, position: int, move: int) -> int:
-        """Apply a tap at cell `move` and return the resulting position."""
-        board, active_color, active_head = self.unhash(position)
+        board, active_color, active_head, starting_dot = self.unhash(position)
 
         if active_color == 0:
-            # Start a new path at this dot
             new_color = self._dots[move]
-            return self.hash(board, new_color, move)
+            return self.hash(board, new_color, move, move)
 
-        # Complete: tap the partner dot to lock the path
-        if (move in self._dot_set
-                and self._dots[move] == active_color
-                and move != active_head):
+        ep1, ep2 = self._color_endpoints[active_color]
+        partner = ep2 if starting_dot == ep1 else ep1
+
+        if move == partner:
             board[move] = active_color
-            return self.hash(board, 0, NO_HEAD)
+            return self.hash(board, 0, NO_HEAD, NO_HEAD)
 
-        # Extend: color the empty adjacent cell and advance the head
         board[move] = active_color
-        return self.hash(board, active_color, move)
+        return self.hash(board, active_color, move, starting_dot)
 
     # ── primitive ─────────────────────────────────────────────────────────────
 
     def primitive(self, position: int) -> Optional[Value]:
-        """
-        Only evaluated at rest states (active_color == 0, between moves).
-
-        Win  — every cell filled AND every color pair connected.
-        Loss — board not solved AND no moves remain (stuck).
-        None — game still in progress.
-        """
-        board, active_color, _ = self.unhash(position)
-
+        board, active_color, _, _ = self.unhash(position)
         if active_color != 0:
             return None
-
-        board_full = all(c != 0 for c in board)
-
-        if board_full:
-            # Board is full: either it's solved or it's a dead end
-            if _all_connected(board, self._dots):
-                return Value.Win
-            return Value.Loss
-
-        if not self.generate_moves(position):
-            return Value.Loss
-
+        if all(c != 0 for c in board):
+            return Value.Win if _all_connected(board, self._dots) else Value.Loss
         return None
 
     # ── to_string ─────────────────────────────────────────────────────────────
 
     def to_string(self, position: int, mode: StringMode) -> str:
-        """
-        Autogui  ->  compact single-line:  '<25 digits>_<color>_<head>'
-        Readable ->  pretty 5x5 grid with column/row labels.
-                     The active path head is shown in lowercase.
-        """
-        board, active_color, active_head = self.unhash(position)
+        board, active_color, active_head, _ = self.unhash(position)
 
         if mode == StringMode.AUTOGUI:
             cells = "".join(str(c) for c in board)
             return f"{cells}_{active_color}_{active_head}"
 
-        # Readable: labelled grid
         lines = ["  0 1 2 3 4"]
         for r in range(SIZE):
             row = f"{r} "
@@ -290,10 +222,9 @@ class FlowFree(Game):
                 idx = r * SIZE + c
                 ch  = COLOR_NAMES[board[idx]]
                 if active_color != 0 and idx == active_head:
-                    ch = ch.lower()   # mark the active tip in lowercase
+                    ch = ch.lower()
                 row += ch + " "
             lines.append(row.rstrip())
-
         head_label   = str(active_head) if active_color != 0 else "-"
         active_label = COLOR_NAMES.get(active_color, "?")
         lines.append(f"Drawing: {active_label}   Head: {head_label}")
@@ -302,30 +233,18 @@ class FlowFree(Game):
     # ── from_string ───────────────────────────────────────────────────────────
 
     def from_string(self, strposition: str) -> int:
-        """
-        Parse a position string (Autogui format) back to an integer.
-        Expected format: '<25 digits>_<active_color>_<active_head>'
-        """
         parts = strposition.strip().split("_")
         if len(parts) != 3:
-            raise ValueError(
-                f"Expected format '<cells>_<color>_<head>', got: {strposition!r}"
-            )
+            raise ValueError(f"Expected '<cells>_<color>_<head>', got: {strposition!r}")
         cells_str, ac_str, ah_str = parts
         if len(cells_str) != NCELLS:
-            raise ValueError(f"Expected {NCELLS} cell digits, got {len(cells_str)}")
-        board        = [int(ch) for ch in cells_str]
-        active_color = int(ac_str)
-        active_head  = int(ah_str)
-        return self.hash(board, active_color, active_head)
+            raise ValueError(f"Expected {NCELLS} digits, got {len(cells_str)}")
+        # starting_dot not stored in string; infer it as NO_HEAD (rest states only)
+        return self.hash([int(ch) for ch in cells_str], int(ac_str), int(ah_str), NO_HEAD)
 
     # ── move_to_string ────────────────────────────────────────────────────────
 
     def move_to_string(self, move: int, mode: StringMode) -> str:
-        """
-        Autogui  ->  raw integer string,  e.g. '13'
-        Readable ->  'row,col' string,    e.g. '2,3'
-        """
         if mode == StringMode.AUTOGUI:
             return str(move)
         r, c = divmod(move, SIZE)
