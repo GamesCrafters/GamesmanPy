@@ -18,17 +18,6 @@ class TUI:
             print("Current position:")
             self.print_position(game, curr_pos)
             moves = game.generate_moves(curr_pos)
-<<<<<<< HEAD
-            # print("MOVES: ", moves)
-            (curr_rem, curr_val) = db.get(curr_pos)
-            print(f'Position is a {"win" if curr_val == Value.Win else "lose"} in {curr_rem} moves.')
-            moves_map = {self.get_move_string(game, move): move for move in moves}
-            for move in moves_map.keys():
-                possible = game.do_move(curr_pos, moves_map[move])
-                (rem, val) = db.get(possible)
-                print(f'{move}: {"Winning Move" if self.get_move_value(val) == Value.Win else "Losing Move"} in {rem}')
-            # print(moves_map.keys())
-=======
             hashed = self.game.hash_ext(curr_pos)
             (curr_rem, curr_val) = db.get(hashed)
             print(f'Position is a {self.get_value_str(curr_val)} in {curr_rem} moves.')
@@ -39,7 +28,6 @@ class TUI:
                 (rem, val) = db.get(hashed_child)
                 move_val = self.get_move_value(val)
                 print(f'{move}: {self.get_value_str(move_val)} in {rem}')
->>>>>>> origin/main
             user_move = self.get_valid_move(moves_map.keys())
             curr_pos = game.do_move(curr_pos, moves_map[user_move])
         self.print_position(game, curr_pos)

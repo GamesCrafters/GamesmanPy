@@ -146,6 +146,36 @@ class Hashi(Game):
         """
         Returns a string representation of the position with coordinate visualization.
         """
+        if mode == StringMode.AutoGUI:
+            nodes = puzzles[self._variant_id]
+            max_x = max(n[0] for n in nodes)
+            max_y = max(n[1] for n in nodes)
+            
+            # midpoints r integers, scaling yb 2
+            width = (max_x * 2) + 1
+            height = (max_y * 2) + 1
+            gui_array = ["-"] * (width * height)
+
+            # islands
+            for x, y, val in nodes:
+                idx = (y * 2) * width + (x * 2)
+                gui_array[idx] = str(val)
+
+            # edge midpoints
+            for i, ((x1, y1), (x2, y2)) in enumerate(self.edges):
+                bridges = (position // (3 ** i)) % 3
+                if bridges == 0:
+                    continue
+                
+                idx = (y1 + y2) * width + (x1 + x2)
+                
+                if x1 == x2:  # vert
+                    gui_array[idx] = 'v' if bridges == 1 else 'V'
+                else:         # horiz
+                    gui_array[idx] = 'h' if bridges == 1 else 'H'
+
+            return "".join(gui_array)
+        
         nodes = puzzles[self._variant_id]
         
         min_x = min(n[0] for n in nodes)
@@ -221,6 +251,20 @@ class Hashi(Game):
         """
         Returns a string representation of the move based on the given mode.
         """
+        if mode == StringMode.AutoGUI:
+            nodes = puzzles[self._variant_id]
+            max_x = max(n[0] for n in nodes)
+            width = (max_x * 2) + 1
+            
+            (x1, y1), (x2, y2) = self.edges[move]
+            
+            # starting and ending centers
+            center1 = (y1 * 2) * width + (x1 * 2)
+            center2 = (y2 * 2) * width + (x2 * 2)
+            
+            # L type move
+            return f"L_{center1}_{center2}_x"
+
         ind = move
         x1,y1 = self.edges[ind][0]
         x2,y2 = self.edges[ind][1]
