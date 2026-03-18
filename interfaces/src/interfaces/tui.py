@@ -18,13 +18,16 @@ class TUI:
             print("Current position:")
             self.print_position(game, curr_pos)
             moves = game.generate_moves(curr_pos)
-            (curr_rem, curr_val) = db.get(curr_pos)
-            print(f'Position is a {"win" if curr_val == Value.Win else "lose"} in {curr_rem} moves.')
+            hashed = self.game.hash_ext(curr_pos)
+            (curr_rem, curr_val) = db.get(hashed)
+            print(f'Position is a {self.get_value_str(curr_val)} in {curr_rem} moves.')
             moves_map = {self.get_move_string(game, move): move for move in moves}
             for move in moves_map.keys():
                 possible = game.do_move(curr_pos, moves_map[move])
-                (rem, val) = db.get(possible)
-                print(f'{move}: {"Winning Move" if self.get_move_value(val) == Value.Win else "Losing Move"} in {rem}')
+                hashed_child = self.game.hash_ext(possible)
+                (rem, val) = db.get(hashed_child)
+                move_val = self.get_move_value(val)
+                print(f'{move}: {self.get_value_str(move_val)} in {rem}')
             user_move = self.get_valid_move(moves_map.keys())
             curr_pos = game.do_move(curr_pos, moves_map[user_move])
         self.print_position(game, curr_pos)
@@ -40,12 +43,19 @@ class TUI:
         if child_val == Value.Win:
             return Value.Loss
         return Value.Draw
+    
+    def get_value_str(self, val):
+        match val:
+            case Value.Win: return "win"
+            case Value.Loss: return "loss"
+            case Value.Tie: return "tie"
+            case Value.Draw: return "draw"
 
     def print_position(self, game: Game, position: int):
-        print(game.to_string(position, StringMode.Readable))
+        print(game.to_string(position, StringMode.TUI))
     
     def get_move_string(self, game: Game, move: int):
-        return game.move_to_string(move, StringMode.Readable)
+        return game.move_to_string(move, StringMode.TUI)
     
     def get_valid_move(self, moves: list[str]) -> str:
         user_input = input("Select a move: ")

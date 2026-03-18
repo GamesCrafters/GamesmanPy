@@ -42,27 +42,33 @@ def get_pos(game_id: str, variant_id: str):
     game = _game(variant_id)
     pos = game.from_string(stringpos)
     db = SqliteDB(game_id, variant_id)
-    entry = db.get(pos)
+    hashed_pos = game.hash_ext(pos)
+    entry = db.get(hashed_pos)
     if entry is None:
         abort(404, "Position not in database.")
     (rem, val) = entry
+
     moves = []
+
     if game.primitive(pos) is None:
-        moves = game.generate_moves(pos)
+        moves =  game.generate_moves(pos)
+    
     move_objs = []
     for move in moves:
         new_pos = game.do_move(pos, move)
-        child = db.get(new_pos)
+        new_hashed_pos = game.hash_ext(new_pos)
+        child = db.get(new_hashed_pos)
         if child is not None:
             (child_rem, child_val) = child
-            move_objs.append({
+            item = {
                 "position": game.to_string(new_pos, StringMode.Readable),
                 "autoguiPosition": game.to_string(new_pos, StringMode.AUTOGUI),
                 "positionValue": value_to_string(child_val),
                 "move": game.move_to_string(move, StringMode.Readable),
                 "autoguiMove": game.move_to_string(move, StringMode.AUTOGUI),
                 "remoteness": child_rem,
-            })
+            }
+            move_objs.append(item)
     response = {
         'position': stringpos,
         'autoguiPosition': game.to_string(pos, StringMode.AUTOGUI),

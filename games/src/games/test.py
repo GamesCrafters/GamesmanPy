@@ -1,65 +1,70 @@
-from abc import ABC, abstractmethod
+from models import Game, Value, StringMode
 from typing import Optional
-from .util import Value, StringMode
 
+class Test(Game):
+    id = 'test'
+    variants = ["regular"]
+    n_players = 1
+    cyclic = False
 
-class Game(ABC):
-    @abstractmethod
     def __init__(self, variant_id: str):
+        """
+        Define instance variables here (i.e. variant information)
+        """
+        if variant_id not in Test.variants:
+            raise ValueError("Variant not defined")
+        self._variant_id = variant_id
         pass
 
-    @abstractmethod
     def start(self) -> int:
         """
         Returns the starting position of the game.
         """
-        raise NotImplementedError("start() not implemented.")
+        return 1
     
-    @abstractmethod
     def generate_moves(self, position: int) -> list[int]:
         """
         Returns a list of positions given the input position.
         """
-        raise NotImplementedError("generate_moves() not implemented.")
+        if position == 1:
+            return [2, 3]
+        elif position == 2:
+            return [4, 5]
+        elif position == 4:
+            return [2]
+        return []
     
-    @abstractmethod
     def do_move(self, position: int, move: int) -> int:
         """
         Returns the resulting position of applying move to position.
         """
-        raise NotImplementedError("do_move() not implemented.")
+        return move
 
-    @abstractmethod
     def primitive(self, position: int) -> Optional[Value]:
         """
         Returns a Value enum which defines whether the current position is a win, loss, or non-terminal. 
         """
-        raise NotImplementedError("primitive() not implemented.")
+        if position == 3:
+            return Value.Win
+        return None
 
-    @abstractmethod
-    def to_string(self, position, mode: StringMode) -> str:
+    def to_string(self, position: int, mode: StringMode) -> str:
         """
         Returns a string representation of the position based on the given mode.
         """
-        raise NotImplementedError("to_string() not implemented.")
+        return str(position)
 
-    @abstractmethod
     def from_string(self, strposition: str) -> int:
         """
         Returns the position from a string representation of the position.
         Input string is StringMode.Readable.
         """
-        raise NotImplementedError("from_string() not implemented.")
+        return int(strposition)
 
-    @abstractmethod
     def move_to_string(self, move: int, mode: StringMode) -> str:
         """
         Returns a string representation of the move based on the given mode.
         """
-        raise NotImplementedError("move_to_string() not implemented.")
+        return str(move)
+
     
-    def hash_ext(self, position) -> int:
-        return position
-    
-    def unhash_ext(self, hashed_pos) -> int:
-        return hashed_pos
