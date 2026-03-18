@@ -17,19 +17,19 @@ class TUI:
         while game.primitive(curr_pos) is None:
             print("Current position:")
             self.print_position(game, curr_pos)
-            moves = game.generate_single_move(curr_pos)
+            moves = game.generate_moves(curr_pos)
             hashed = self.game.hash_ext(curr_pos)
             (curr_rem, curr_val) = db.get(hashed)
             print(f'Position is a {self.get_value_str(curr_val)} in {curr_rem} moves.')
             moves_map = {self.get_move_string(game, move): move for move in moves}
             for move in moves_map.keys():
-                possible = game.resolve_move(curr_pos, moves_map[move])
+                possible = game.do_move(curr_pos, moves_map[move])
                 hashed_child = self.game.hash_ext(possible)
                 (rem, val) = db.get(hashed_child)
                 move_val = self.get_move_value(val)
                 print(f'{move}: {self.get_value_str(move_val)} in {rem}')
             user_move = self.get_valid_move(moves_map.keys())
-            curr_pos = game.resolve_move(curr_pos, moves_map[user_move])
+            curr_pos = game.do_move(curr_pos, moves_map[user_move])
         self.print_position(game, curr_pos)
         print("GAME OVER")
 
@@ -52,10 +52,10 @@ class TUI:
             case Value.Draw: return "draw"
 
     def print_position(self, game: Game, position: int):
-        print(game.to_string(position, StringMode.Readable))
+        print(game.to_string(position, StringMode.TUI))
     
     def get_move_string(self, game: Game, move: int):
-        return game.move_to_string(move, StringMode.Readable)
+        return game.move_to_string(move, StringMode.TUI)
     
     def get_valid_move(self, moves: list[str]) -> str:
         user_input = input("Select a move: ")
