@@ -3,7 +3,7 @@ from typing import Optional
 
 class Sokoban(Game):
     id = 'sokoban'
-    variants = ["1", "2"]
+    variants = ["1", "2", "3", "4", "5"]
     n_players = 1
     cyclic = True 
 
@@ -22,8 +22,8 @@ class Sokoban(Game):
 
         match self._variant_id:
             case "1": # equivalent to Level 1 from the online Sokoban player
-                self.row_size = 6
-                self.column_size = 7
+                self.column_size = 6
+                self.row_size = 7
                 self.starting_pos = (
                     "##   #"
                     ".@$  #"
@@ -34,8 +34,8 @@ class Sokoban(Game):
                     "   .  "
                 )
             case "2":
-                self.row_size = 8
                 self.column_size = 8
+                self.row_size = 8
                 self.starting_pos = (
                     "  ###   "
                     "  # #   "
@@ -45,6 +45,54 @@ class Sokoban(Game):
                     "####   #"
                     "   #   #"
                     "   #####"
+                )
+
+            case "3":
+                self.column_size = 11
+                self.row_size = 10
+                self.starting_pos = (
+                    "########## "
+                    "#        # "
+                    "# $$ $   # "
+                    "#      ### "
+                    "####   #   "
+                    "   # @ #   "
+                    "   # $ #   "
+                    "####   ####"
+                    "#....     #"
+                    "###########"
+                )
+            case "4":
+                self.column_size = 9
+                self.row_size = 9
+                self.starting_pos = (
+                    "  #####  "
+                    "  #   #  "
+                    "###$  #  "
+                    "#   $ #  "
+                    "#   @ ###"
+                    "##### $ #"
+                    "  ### $ #"
+                    "  #.... #"
+                    "  #######"
+                )
+            #"                      "
+            case "5":
+                self.column_size = 23
+                self.row_size = 12
+                self.starting_pos = (
+                    "    #####              "
+                    "    #   #              "
+                    "    #$  #              "
+                    "  ###  $###            "
+                    "  #  $  $ #            "
+                    "### # ### #            "
+                    "#   # ### #      ######"
+                    "#   # ### ########  ..#"
+                    "# $  $              ..#"
+                    "##### ####  #@####  ..#"
+                    "    #       ###  ######"
+                    "    #########          "
                 )
            
     def start(self) -> str:
@@ -60,7 +108,7 @@ class Sokoban(Game):
         
         p_idx = self.get_pos_idx(position)
             
-        px, py = p_idx % self.row_size, p_idx // self.row_size
+        px, py = p_idx % self.column_size, p_idx // self.column_size
         
         # 1. BFS to find all spaces the player can currently reach
         reachable = set()
@@ -73,23 +121,23 @@ class Sokoban(Game):
                 
                 for dx, dy in self.dxdy:
                     nx, ny = curr_x + dx, curr_y + dy
-                    if 0 <= nx < self.row_size and 0 <= ny < self.column_size:
-                        n_idx = ny * self.row_size + nx
+                    if 0 <= nx < self.column_size and 0 <= ny < self.row_size:
+                        n_idx = ny * self.column_size + nx
                         if position[n_idx] in [' ', '.']:
                             queue.append((nx, ny))
         
         # 2. Check all boxes to see if they can be pushed
-        for y in range(self.column_size):
-            for x in range(self.row_size):
-                idx = y * self.row_size + x
+        for y in range(self.row_size):
+            for x in range(self.column_size):
+                idx = y * self.column_size + x
                 if position[idx] in ['$', '*']: # Found a box
                     for dx, dy in self.dxdy:
                         player_req_x, player_req_y = x - dx, y - dy
                         push_target_x, push_target_y = x + dx, y + dy
                         
                         if (player_req_x, player_req_y) in reachable:
-                            if 0 <= push_target_x < self.row_size and 0 <= push_target_y < self.column_size:
-                                target_idx = push_target_y * self.row_size + push_target_x
+                            if 0 <= push_target_x < self.column_size and 0 <= push_target_y < self.row_size:
+                                target_idx = push_target_y * self.column_size + push_target_x
                                 if position[target_idx] in [' ', '.', '@', '+']:
                                     moves.append((idx, dx, dy))
         return moves
@@ -103,10 +151,10 @@ class Sokoban(Game):
         pos_list[p_idx] = '.' if pos_list[p_idx] == '+' else ' '
         
         # 2. Calculate new coordinates for the pushed box
-        bx = box_idx % self.row_size
-        by = box_idx // self.row_size
+        bx = box_idx % self.column_size
+        by = box_idx // self.column_size
         nx, ny = bx + dx, by + dy 
-        n_idx = ny * self.row_size + nx
+        n_idx = ny * self.column_size + nx
         
         # 3. Place the box in its new location
         if pos_list[n_idx] == '.':
@@ -133,14 +181,14 @@ class Sokoban(Game):
             return Value.Win
 
         # 2. Corner Deadlock Detection
-        for y in range(self.column_size):
-            for x in range(self.row_size):
-                idx = y * self.row_size + x
+        for y in range(self.row_size):
+            for x in range(self.column_size):
+                idx = y * self.column_size + x
                 if position[idx] == '$':
-                    up = (y == 0) or (position[(y - 1) * self.row_size + x] == '#')
-                    down = (y == self.column_size - 1) or (position[(y + 1) * self.row_size + x] == '#')
-                    left = (x == 0) or (position[y * self.row_size + (x - 1)] == '#')
-                    right = (x == self.row_size - 1) or (position[y * self.row_size + (x + 1)] == '#')
+                    up = (y == 0) or (position[(y - 1) * self.column_size + x] == '#')
+                    down = (y == self.row_size - 1) or (position[(y + 1) * self.column_size + x] == '#')
+                    left = (x == 0) or (position[y * self.column_size + (x - 1)] == '#')
+                    right = (x == self.column_size - 1) or (position[y * self.column_size + (x + 1)] == '#')
 
                     if (up or down) and (left or right):
                         return Value.Loss
@@ -166,7 +214,7 @@ class Sokoban(Game):
         
         # 4. Calculate how many bits we need per index
         # For an 8x8 board (64 tiles, max index 63), this returns 6 bits.
-        max_index = self.row_size * self.column_size - 1
+        max_index = self.column_size * self.row_size - 1
         bits_per_index = max_index.bit_length() 
         
         packed_hash = p_idx
@@ -183,7 +231,7 @@ class Sokoban(Game):
 
     def to_string(self, position: str, mode: StringMode) -> str:
         if mode in [StringMode.Readable, StringMode.TUI]:
-            board = [position[idx * self.row_size : (idx + 1) * self.row_size] for idx in range(self.column_size)]
+            board = [position[idx * self.column_size : (idx + 1) * self.column_size] for idx in range(self.row_size)]
             return "\n".join(board)
         else:
             return f"{self._variant_id}_" + position.replace(' ', '-') 
