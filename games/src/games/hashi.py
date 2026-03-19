@@ -146,7 +146,7 @@ class Hashi(Game):
         """
         Returns a string representation of the position with coordinate visualization.
         """
-        if mode == StringMode.AutoGUI:
+        if mode == StringMode.AUTOGUI:
             nodes = puzzles[self._variant_id]
             max_x = max(n[0] for n in nodes)
             max_y = max(n[1] for n in nodes)
@@ -167,14 +167,25 @@ class Hashi(Game):
                 if bridges == 0:
                     continue
                 
-                idx = (y1 + y2) * width + (x1 + x2)
-                
-                if x1 == x2:  # vert
-                    gui_array[idx] = 'v' if bridges == 1 else 'V'
-                else:         # horiz
-                    gui_array[idx] = 'h' if bridges == 1 else 'H'
+                if x1 == x2:  # Vertical bridge
+                    char = 'v' if bridges == 1 else 'V'
+                    # Fill every scaled Y coordinate between the two islands
+                    start_y = min(y1, y2) * 2 + 1
+                    end_y = max(y1, y2) * 2
+                    for y_pixel in range(start_y, end_y):
+                        idx = (y_pixel * width) + (x1 * 2)
+                        gui_array[idx] = char
+                        
+                else:         # Horizontal bridge
+                    char = 'h' if bridges == 1 else 'H'
+                    # Fill every scaled X coordinate between the two islands
+                    start_x = min(x1, x2) * 2 + 1
+                    end_x = max(x1, x2) * 2
+                    for x_pixel in range(start_x, end_x):
+                        idx = (y1 * 2) * width + x_pixel
+                        gui_array[idx] = char
 
-            return "".join(gui_array)
+            return "1_" + "".join(gui_array)
         
         nodes = puzzles[self._variant_id]
         
@@ -231,45 +242,51 @@ class Hashi(Game):
             output.append(f'Edge {e}: ({ex1}, {ey1})-({ex2}, {ey2}), bridges: {b_count}')
 
         print(grid_display)
-        return '\n'.join(output)
+        print('\n'.join(output))
+        return str(position)
 
     def from_string(self, strposition: str) -> int:
         """
         Returns the position from a string representation of the position.
         Input string is StringMode.Readable.
         """
-        position = 0
-        lines = strposition.strip().split('\n')
-        for i, line in enumerate(lines):
-            if not line:
-                continue
-            bridge_count = int(line.split('bridges: ')[1])
-            position += bridge_count * (3 ** i)
+        # position = 0
+        # lines = strposition.strip().split('\n')
+        # for i, line in enumerate(lines):
+        #     if not line:
+        #         continue
+        #     bridge_count = int(line.split('bridges: ')[1])
+        #     position += bridge_count * (3 ** i)
 
-        return position
+        return int(strposition.strip())
+
     def move_to_string(self, move: int, mode: StringMode) -> str:
         """
         Returns a string representation of the move based on the given mode.
         """
-        if mode == StringMode.AutoGUI:
+        if mode == StringMode.AUTOGUI:
             nodes = puzzles[self._variant_id]
             max_x = max(n[0] for n in nodes)
             width = (max_x * 2) + 1
             
             (x1, y1), (x2, y2) = self.edges[move]
             
-            # starting and ending centers
-            center1 = (y1 * 2) * width + (x1 * 2)
-            center2 = (y2 * 2) * width + (x2 * 2)
+            if x1 == x2: # Vertical bridge
+                btn_x = x1 * 2
+                btn_y = y1 + y2
+                char = 'Q' # Vertical pill
+            else:        # Horizontal bridge
+                btn_x = x1 + x2
+                btn_y = y1 * 2
+                char = 'q' # Horizontal pill
+                
+            btn_center = (btn_y * width) + btn_x
             
-            # L type move
-            return f"L_{center1}_{center2}_x"
 
-        ind = move
-        x1,y1 = self.edges[ind][0]
-        x2,y2 = self.edges[ind][1]
+            return f"A_{char}_{btn_center}_x"
 
-        return f"edge {ind}"
+
+        return f"edge {move}"
 
         # return f"Bridge is at edge {ind}: ({x1}, {y1}) to ({x2}, {y2})"
 
