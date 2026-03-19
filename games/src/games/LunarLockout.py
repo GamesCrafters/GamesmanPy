@@ -174,6 +174,8 @@ class LunarLockout(Game):
 
         if mode == StringMode.AUTOGUI:
             return "1_" + "".join("".join(r) for r in board)
+        if mode == StringMode.Readable:
+            return "".join("".join(r) for r in board)
 
         return "\n".join(" ".join(r) for r in board)
 
