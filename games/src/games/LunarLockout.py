@@ -3,7 +3,6 @@ from typing import Optional
 
 class LunarLockout(Game):
     id = 'lunarlockout'
-    variants = ["puzzle1"]
     board_size = ["5x5"]
     n_players = 1
     cyclic = False
@@ -13,6 +12,17 @@ class LunarLockout(Game):
     _move_down = 2
     _move_left = 3
 
+    variants = {
+        "easy": {
+            "robots": [20, 7, 16, 0, 23],
+        },
+        "medium": {
+            "robots": [21, 2, 4, 11, 18],
+        },
+        "hard": {
+            "robots": [2, 0, 4, 20, 24],
+        }
+    }
     # Store the variant and board dimensions (5x5).
     # Define constants: center square index (12), removed-robot value (31), and total robots (5).
     # Robot index 0 always represents the red robot.
@@ -25,6 +35,7 @@ class LunarLockout(Game):
         if variant_id not in LunarLockout.variants:
             raise ValueError("Variant not defined")
         self._variant_id = variant_id
+        self._config = LunarLockout.variants[variant_id]
 
         # Board dimensions
         size_string = LunarLockout.board_size[0]
@@ -36,7 +47,7 @@ class LunarLockout(Game):
         self._max_row = self._rows - 1
         self._max_col = self._cols - 1
         # Robot configs
-        self._robot_count = 5
+        self._robot_count = len(self._config["robots"])
         self._red_index = 0
         self._removed = 31
         # Encoding
@@ -60,17 +71,14 @@ class LunarLockout(Game):
         """
         Returns the starting position of the game.
         """
-        # All values must be 0–24 and no duplicates.
-        red = 20
-        r1 = 7
-        r2 = 16
-        r3 = 0
-        r4 = 23
-        robots = [red, r1, r2, r3, r4]
-        if red == 12:
+        robots = self._config["robots"].copy()
+        # Validate: red not already winning
+        if robots[self._red_index] == self._center:
             raise ValueError("Red cannot start at exit")
+        # Optional (good practice): no duplicates
+        if len(set(robots)) != len(robots):
+            raise ValueError("Duplicate robot positions")
         return self.pack(robots)
-    
 
     # Decode the state into robot positions.
     # Skip robots marked as removed (31).
@@ -190,10 +198,25 @@ class LunarLockout(Game):
         strposition = strposition.replace("\\n", "\n")
         board = strposition.replace(" ", "").replace("\n", "")
 
+        # Validate board size
+        if len(board) != self._cells:
+            raise ValueError("Invalid board size")
+
         robots = [self._removed] * self._robot_count
+
         for i, cell in enumerate(board):
-            if cell in ["0","1","2","3","4"]:
-                robots[int(cell)] = i
+            if cell in ["0", "1", "2", "3", "4"]:
+                idx = int(cell)
+
+                # Check duplicate robot
+                if robots[idx] != self._removed:
+                    raise ValueError("Duplicate robot in board")
+
+                robots[idx] = i
+
+        # Red robot must exist
+        if robots[self._red_index] == self._removed:
+            raise ValueError("Red robot missing")
 
         return self.pack(robots)
 
