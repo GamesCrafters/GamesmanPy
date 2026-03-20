@@ -65,9 +65,10 @@ def get_pos(game_id: str, variant_id: str):
                 "autoguiPosition": game.to_string(new_pos, StringMode.AUTOGUI),
                 "positionValue": value_to_string(child_val),
                 "move": game.move_to_string(move, StringMode.Readable),
-                "autoguiMove": game.move_to_string(move, StringMode.AUTOGUI),
-                "remoteness": child_rem,
+                "autoguiMove": game.move_to_string(move, StringMode.AUTOGUI)
             }
+            if child_val == Value.Win:
+                item["remoteness"] = child_rem
             move_objs.append(item)
     response = {
         'position': stringpos,
