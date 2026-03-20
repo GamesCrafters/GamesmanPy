@@ -13,14 +13,17 @@ class LunarLockout(Game):
     _move_left = 3
 
     variants = {
-        "easy": {
+        "beginner": {
             "robots": [20, 7, 16, 0, 23],
         },
-        "medium": {
+        "easy": {
             "robots": [21, 2, 4, 11, 18],
         },
-        "hard": {
+        "medium": {
             "robots": [2, 0, 4, 20, 24],
+        },
+        "hard": {
+            "robots": [24, 2, 4, 10, 18, 20],
         }
     }
     # Store the variant and board dimensions (5x5).
@@ -170,8 +173,7 @@ class LunarLockout(Game):
         """ 
         robot_positions = self.unpack(position)
         board = [["-" for _ in range(self._cols)] for _ in range(self._rows)]
-
-        symbols = ["0", "1", "2", "3", "4"]
+        symbols = [str(i) for i in range(self._robot_count)]
 
         for i, p in enumerate(robot_positions):
             if p == self._removed:
@@ -204,14 +206,16 @@ class LunarLockout(Game):
 
         robots = [self._removed] * self._robot_count
 
-        for i, cell in enumerate(board):
-            if cell in ["0", "1", "2", "3", "4"]:
-                idx = int(cell)
 
+        for i, cell in enumerate(board):
+            if cell.isdigit():
+                idx = int(cell)
+                # Reject robots outside allowed range
+                if idx >= self._robot_count:
+                    raise ValueError("Invalid robot index")
                 # Check duplicate robot
                 if robots[idx] != self._removed:
                     raise ValueError("Duplicate robot in board")
-
                 robots[idx] = i
 
         # Red robot must exist
