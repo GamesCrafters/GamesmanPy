@@ -1,9 +1,10 @@
 from models import Game, Value, StringMode
 from typing import Optional
+import time
 
 class Sokoban(Game):
     id = 'sokoban'
-    variants = ["1", "2", "3", "4", "5"]
+    variants = ["1", "2", "3", "4", "5", "6"]
     n_players = 1
     cyclic = True 
 
@@ -94,6 +95,22 @@ class Sokoban(Game):
                     "    #       ###  ######"
                     "    #########          "
                 )
+            #"              "
+            case "6":
+                self.column_size = 14
+                self.row_size = 10
+                self.starting_pos = (
+                    "############  "
+                    "#..  #     ###"
+                    "#..  # $  $  #"
+                    "#..  #$####  #"
+                    "#..    @ ##  #"
+                    "#..  # #  $  #"
+                    "###### ##$ $ #"
+                    "  # $  $ $ $ #"
+                    "  #    #     #"
+                    "  ############"
+                )
            
     def start(self) -> str:
         """Returns the starting position of the game."""
@@ -127,6 +144,7 @@ class Sokoban(Game):
                             queue.append((nx, ny))
         
         # 2. Check all boxes to see if they can be pushed
+        # O(nm) check
         for y in range(self.row_size):
             for x in range(self.column_size):
                 idx = y * self.column_size + x
@@ -179,7 +197,13 @@ class Sokoban(Game):
         # 1. Win Condition
         if position.find('$') == -1:
             return Value.Win
+        
+        all_boxes = set()
+        for i, char in enumerate(position):
+            if char in ['$', '*']:
+                all_boxes.add(i)
 
+        
         # 2. Corner Deadlock Detection
         for y in range(self.row_size):
             for x in range(self.column_size):
@@ -193,8 +217,43 @@ class Sokoban(Game):
                     if (up or down) and (left or right):
                         return Value.Loss
 
+
+        # while loop should only run a maximum of B times
+        # where B is the number of boxes in the position
+        """
+        while True:
+            moves = self.generate_moves(current_position)
+            new_live_boxes = set(move[0] for move in moves)
+
+            if not new_live_boxes:
+                break
+                
+            live_boxes.update(new_live_boxes)
+
+            pos_list = list(position)
+            for idx in live_boxes:
+                if pos_list[idx] == '$':
+                    pos_list[idx] = ' '
+                elif pos_list[idx] == '*':
+                    pos_list[idx] = '.'
+
+            current_position = "".join(pos_list)
+            
+        
+        dead_boxes = all_boxes - live_boxes
+
+        for idx in dead_boxes:
+            # If a Dead Box is NOT on a goal square ('*'), the state is lost
+            if position[idx] != '*':
+                return Value.Loss
+        """
+
         return None
 
+    #optimize hash because this is not going to store level 6 or beyond
+    #it takes more than 64 bits so that is incredibly chopped
+    #lowk the hash is supposed to hash every state, so if a position has 20,000,000 states
+    #you should be able to just hash that since 2^64 = 10^19
     def hash_ext(self, position: str) -> int:
         """
         Returns a perfect hash using bitpacking.
@@ -227,17 +286,23 @@ class Sokoban(Game):
     def move_to_string(self, move: tuple, mode: StringMode) -> str:
         box_idx, dx, dy = move
         direction = self.dirs.get((dx, dy), "?")
+        if mode == StringMode.AUTOGUI:
+            return f"M_{box_idx}_{box_idx + dx + dy*self.column_size}_y"
         return f"{box_idx}{direction}"
 
     def to_string(self, position: str, mode: StringMode) -> str:
-        if mode in [StringMode.Readable, StringMode.TUI]:
+        
+        if mode == StringMode.TUI:
             board = [position[idx * self.column_size : (idx + 1) * self.column_size] for idx in range(self.row_size)]
             return "\n".join(board)
+        elif mode == StringMode.Readable:
+            return position.replace(' ', '-').replace('#', 'W').replace("@", "p").replace("$", "b").replace("*", "g").replace("+", "P")
         else:
-            return f"{self._variant_id}_" + position.replace(' ', '-') 
+            return "1_" + position.replace(' ', '-').replace('#', 'W').replace("@", "p").replace("$", "b").replace("*", "g").replace("+", "P")
 
     def from_string(self, strposition: str) -> str:
-        return strposition.replace("\n", "")
+        clean_pos = strposition.replace('-', ' ').replace('W', '#').replace("p", "@").replace("b", "$").replace("g", "*").replace("P", "+")
+        return clean_pos.replace("\n", "").replace("\r", "")
     
     #helper functions
     def get_pos_idx(self, position: str):
@@ -245,3 +310,61 @@ class Sokoban(Game):
         if p_idx == -1:
             p_idx = position.find('+')
         return p_idx; 
+
+
+def benchmark_sweep(variant_id="6", iterations=1000):
+    print(f"--- Benchmarking Sokoban Variant {variant_id} ---")
+
+    # 1. Initialize the game and get the starting position
+    game = Sokoban(variant_id)
+    position = game.start()
+
+    # 2. Warm up (optional, but helps get past initial Python overhead)
+    game.primitive(position)
+
+    # 3. Start the clock
+    start_time = time.perf_counter()
+
+    # 4. Hammer the primitive function
+    for _ in range(iterations):
+        game.primitive(position)
+        
+    # 5. Stop the clock
+    end_time = time.perf_counter()
+
+    # 6. Crunch the numbers
+    total_time = end_time - start_time
+    ms_per_call = (total_time / iterations) * 1000
+    states_per_second = iterations / total_time
+
+    print(f"Total time for {iterations} checks: {total_time:.4f} seconds")
+    print(f"Average time per primitive() call:  {ms_per_call:.4f} ms")
+    print(f"States evaluated per second:        {states_per_second:,.0f} states/sec\n")
+
+# Run the benchmark when you execute the file
+if __name__ == "__main__":
+
+    benchmark_sweep("1", 1000)
+    
+    # Let's do a stress test of 10,000 just for fun
+    benchmark_sweep("1", 10000)
+
+    benchmark_sweep("2", 1000)
+    
+    # Let's do a stress test of 10,000 just for fun
+    benchmark_sweep("2", 10000)
+
+    benchmark_sweep("3", 1000)
+    
+    # Let's do a stress test of 10,000 just for fun
+    benchmark_sweep("3", 10000)
+
+    benchmark_sweep("5", 1000)
+    
+    # Let's do a stress test of 10,000 just for fun
+    benchmark_sweep("5", 10000)
+
+    benchmark_sweep("6", 1000)
+    
+    # Let's do a stress test of 10,000 just for fun
+    benchmark_sweep("6", 10000)
