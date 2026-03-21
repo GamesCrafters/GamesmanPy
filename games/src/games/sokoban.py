@@ -1,6 +1,7 @@
 from models import Game, Value, StringMode
 from typing import Optional
 import time
+import math
 
 class Sokoban(Game):
     id = 'sokoban'
@@ -220,6 +221,8 @@ class Sokoban(Game):
 
         # while loop should only run a maximum of B times
         # where B is the number of boxes in the position
+        # can not call generate moves --> messes with autogui
+        # also, just a really slow bfs call in general
         """
         while True:
             moves = self.generate_moves(current_position)
@@ -250,15 +253,48 @@ class Sokoban(Game):
 
         return None
 
+
+    def hash_ext(self, position: str) -> int:
+        """
+        Returns a hash using the Combinatorial Number System (Combinadic).
+        Generates a dense, collision-free integer for the game state.
+        """
+
+        p_idx = self.get_pos_idx(position)
+            
+        #optimize this further by maybe storing this?
+        box_indices = [i for i, char in enumerate(position) if char in ['$', '*']]
+        
+        box_indices.sort(reverse=True)
+        
+        box_rank = 0
+        total_boxes = len(box_indices)
+        
+        for i, c in enumerate(box_indices):
+            k = total_boxes - i  
+            box_rank += math.comb(c, k)
+            
+        # prevent overlap from player index by getting max int
+        max_p_idx = self.column_size * self.row_size 
+        
+        hash = (box_rank * max_p_idx) + p_idx
+        
+        return hash
+    
+        """
     #optimize hash because this is not going to store level 6 or beyond
     #it takes more than 64 bits so that is incredibly chopped
     #lowk the hash is supposed to hash every state, so if a position has 20,000,000 states
     #you should be able to just hash that since 2^64 = 10^19
     def hash_ext(self, position: str) -> int:
+        box_rank = get_combinadic_rank(box_indices)
+        perfect_hash = (box_rank * total_valid_tiles) + valid_p_idx
+        """
+      
         """
         Returns a perfect hash using bitpacking.
         Only dynamic elements (Player and Boxes) are stored.
-        """
+
         # 1. Find the player's index
         p_idx = self.get_pos_idx(position)
             
@@ -282,6 +318,7 @@ class Sokoban(Game):
             packed_hash = (packed_hash << bits_per_index) | b_idx
             
         return packed_hash
+    """
 
     def move_to_string(self, move: tuple, mode: StringMode) -> str:
         box_idx, dx, dy = move
