@@ -3,7 +3,7 @@ from .horses import Horses
 from .pancakes import Pancakes
 from .chipschallenge import ChipsChallenge
 from .test import Test
-from .sokoban_cleaned import Sokoban
+from .sokoban import Sokoban
 from models import *
 
 game_list = {
