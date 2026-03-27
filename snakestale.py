@@ -18,22 +18,22 @@ class Snakestale(Game):
                         "water": [],
                         "land_snakes": [],
                         "water_snakes": []},
-                "lvl3":{"board":"5x6", 
-                        "obstacle": [2, 3, 4],
-                        "pos_i": [10, 9, 8, 7], 
-                        "hole_pos": 28, 
-                        "length" : 4, 
-                        "water": [0, 1, 5, 6, 7, 8, 9, 10, 19, 20, 21, 22],
-                        "land_snakes": [27, 26, 25, 24, 18, 12, 13, 14, 15, 16, 17, 23, 29],
-                        "water_snakes": []},
-                "lvl4":{"board":"5x7", 
-                        "obstacle": [14, 16, 23, 30], 
-                        "pos_i": [15, 22, 29], 
-                        "hole_pos": 6, 
-                        "length": 3,
-                        "water": [14, 2, 9, 16, 23, 30, 11, 18, 25, 13, 20, 27, 34],
-                        "land_snakes": [31, 24, 17, 10, 3, 4, 5, 12, 19, 26, 33],
-                        "water_snakes": [27, 20, 13] 
+                "lvl3":{"board":"4x4", 
+                        "obstacle": [3],
+                        "pos_i": [15, 11, 7], 
+                        "hole_pos": 12, 
+                        "length" : 3, 
+                        "water": [1, 2, 5],
+                        "land_snakes": [8, 9, 13],
+                        "water_snakes": [6, 10, 14]},
+                "lvl4":{"board":"4x4", 
+                        "obstacle": [15], 
+                        "pos_i": [7, 3], 
+                        "hole_pos": 1, 
+                        "length": 2,
+                        "water": [5, 9],
+                        "land_snakes": [0, 4, 8, 12, 13, 14, 10, 6, 2],
+                        "water_snakes": [] 
                         }}
     n_players = 1
     cyclic = True
@@ -64,25 +64,10 @@ class Snakestale(Game):
 
     
     def start(self):
-        # pos_str = self.pos_i
-        # pos = self.hash(pos_str)
-        # return pos
         all_snakes = [s.cells for s in self.all_movable_snakes]
         return self.hash_all(all_snakes)
 
     def generate_moves(self, position: int):
-        # snake = self.unhash(position)
-        # head = snake[0]
-        # r, c = divmod(head, self.cols)
-
-        # moves =[]
-        # for dr, dc in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
-        #     nr, nc = r + dr, c + dc
-        #     if 0 <= nr < self.rows and 0 <= nc < self.cols:
-        #         target = nr * self.cols + nc
-        #         if target not in snake[:-1] and target not in self.obstacle:
-        #             moves.append(target)
-        # return moves +
         all_snakes = self.unhash_all(position)
         total_cells = self.rows * self.cols
         moves = []
@@ -117,6 +102,8 @@ class Snakestale(Game):
         board[self.hole_pos] = 'O'
         for obs in self.obstacle:
             board[obs] = 'X'
+        for water_cell in self.water:
+            board[water_cell] = '~'
         symbols = [('H', 's', 'T'), ('L', 'l', 'l'), ('W', 'w', 'w')]
         for i, cells in enumerate(all_snakes):
             h, mid, t = symbols[i] if i < len(symbols) else ('.', '.', '.')
@@ -159,11 +146,22 @@ class Snakestale(Game):
 
     def move_to_string(self, move: int, mode: StringMode) -> str:
         snake_idx, target = divmod(move, self.rows * self.cols)
-        if mode == StringMode.Readable:
-            r, c = divmod(target, self.cols)
-            return f'snake{snake_idx}:{r},{c}'
-        else:
+        if mode == StringMode.AUTOGUI:
             return f'A_-_{move}_x'
+        head = self.all_movable_snakes[snake_idx].cells[0]
+        diff = target - head
+        if diff == -self.cols:
+            direction = 'up'
+        elif diff == self.cols:
+            direction = 'down'
+        elif diff == - 1:
+            direction = 'left'
+        else:
+            direction = 'right'
+        names = ['Player', 'Land', 'Water']
+        name = names[snake_idx] if snake_idx < len(names) else f'snake{snake_idx}'
+        return f'{name}snake: {direction}'
+    
     
     def hash_all(self, all_snakes: list[list]):
         position = 0
@@ -198,7 +196,7 @@ class Snake:
             return False
         if cell in board.obstacle:
             return False
-        for s in board.obstacle_snakes:
+        for s in board.all_movable_snakes:
             if s is not self and cell in s.cells:
                 return False
         return True
@@ -235,8 +233,6 @@ class WaterSnake(Snake):
 class LandSnake(Snake):
     def can_enter(self, cell, board):
         if not super().can_enter(cell, board):
-            return False
-        if cell == board.hole_pos:   
             return False
         if cell in board.water: 
             return False
