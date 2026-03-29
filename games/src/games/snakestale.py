@@ -119,44 +119,69 @@ class Snakestale(Game):
             board[obs] = 'X'
         for water_cell in self.water:
             board[water_cell] = '~'
-        symbols = [('H', 's', 'T'), ('L', 'l', 'l'), ('W', 'w', 'w')]
+        def head_char(cells, head_chars):
+            head, neck = cells[0], cells[1] if len(cells) > 1 else None
+            if neck is None:
+                return head_chars['U']
+            diff = head - neck
+            if diff == -self.cols:
+                return head_chars['U']
+            if diff == self.cols:
+                return head_chars['D']
+            if diff == -1:
+                return head_chars['L']
+            if diff == 1:
+                return head_chars['R']
+            return head_chars['U']
+        player_heads = {'U': '^', 'D': 'v', 'L': '<', 'R': '>'}
+        land_heads   = {'U': 'A', 'D': 'B', 'L': 'C', 'R': 'D'}  # pick unused chars
+        water_heads  = {'U': 'E', 'D': 'F', 'L': 'G', 'R': 'I'}
+        symbols = [
+        (head_char, player_heads, 's', 'T'),
+        (head_char, land_heads,   'l', 'l'),
+        (head_char, water_heads,  'w', 'w'),]
         for i, cells in enumerate(all_snakes):
-            h, mid, t = symbols[i] if i < len(symbols) else ('.', '.', '.')
+            hc_fn, hc_map, mid, t = symbols[i]
             for j, cell in enumerate(cells):
                 if j == 0:
-                    board[cell] = h 
+                    board[cell] = hc_fn(cells, hc_map) 
                 elif j == len(cells) - 1:
                     board[cell] = t
                 else:
                     board[cell] = mid
+        
         s = ''.join(board)
         rows_output = [s[i*self.cols:(i + 1)*self.cols] for i in range(self.rows)]
+        if mode == StringMode.Readable:
+            return ''.join(rows_output)
+        elif mode == StringMode.AUTOGUI:
+            return "1_" + ''.join(rows_output)
         s = '\n'.join(rows_output)
         return s
 
     def from_string(self, strposition: str) -> int:
         flat = strposition.replace('\n', '')
 
-        def parse_snake(length, head_sym, body_sym):
+        def parse_snake(length, head_syms, body_syms):
             cells = [None] * length
             for cell_idx, label in enumerate(flat):
-                if label == head_sym:
+                if label in head_syms:
                     cells[0] = cell_idx
-                elif label == body_sym:
+                elif label in body_syms:
                     for slot in range(1, length):
                         if cells[slot] is None:
                             cells[slot] = cell_idx
                             break
             return cells
 
-        all_snakes = [parse_snake(self.snake_len, 'H', 's')]
-        obs_symbols = [('L', 'l'), ('W', 'w')]
+        all_snakes = [parse_snake(self.snake_len, {'^', 'v', '<', '>'}, {'s', 'T'})]
+        obs_symbols =  [({'A', 'B', 'C', 'D'}, {'l'}), ({'E', 'F', 'G', 'I'}, {'w'})]
         for i, obs_snake in enumerate(self.obstacle_snakes):
             if i < len(obs_symbols): 
-                h_sym, b_sym = obs_symbols[i] 
+                h_syms, b_syms = obs_symbols[i] 
             else:
-                h_sym, b_sym = ('?', '?')
-            all_snakes.append(parse_snake(obs_snake.length, h_sym, b_sym))
+                h_syms, b_syms = ({'?'}, {'?'})
+            all_snakes.append(parse_snake(obs_snake.length, h_syms, b_syms))
         return self.hash_all(all_snakes)
 
     def move_to_string(self, move: int, mode: StringMode) -> str:
