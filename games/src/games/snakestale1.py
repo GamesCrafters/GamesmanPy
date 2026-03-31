@@ -1,7 +1,7 @@
 from models import Game, Value, StringMode
 
-class Snakestale(Game):
-    id = "snakestale"
+class ASnakesTale(Game):
+    id = "snakestale1"
     n_players = 1
     cyclic = True
     variants = {"lvl1": {"board": "4x4",
@@ -42,10 +42,10 @@ class Snakestale(Game):
         """
         Define instance variables here (i.e. variant information)
         """
-        if variant_id not in Snakestale.variants:
+        if variant_id not in ASnakesTale.variants:
             raise ValueError("Variant not defined")
         self.variant_id = variant_id
-        variant_data = Snakestale.variants[variant_id]
+        variant_data = ASnakesTale.variants[variant_id]
         rows_str, cols_str = variant_data["board"].split('x')
         self.rows = int(rows_str)
         self.cols = int(cols_str)
@@ -110,7 +110,7 @@ class Snakestale(Game):
         for obs in self.obstacle:
             board[obs] = 'X'
         for water_cell in self.water:
-            board[water_cell] = 'k'
+            board[water_cell] = '~'
         def get_dir(from_cell, to_cell):
             diff = to_cell - from_cell
             if diff == -self.cols:
@@ -141,8 +141,8 @@ class Snakestale(Game):
             direction = get_dir(cells[-2], cells[-1])
             return tail_chars.get(direction, tail_chars['U'])
            
-        player_heads = {'U': 'w', 'D': 'v', 'L': 'i', 'R': 'r'}
-        land_heads   = {'U': 'A', 'D': 'B', 'L': 'D', 'R': 'C'} # pick unused chars
+        player_heads = {'U': '^', 'D': 'v', 'L': 'i', 'R': 'r'}
+        land_heads   = {'U': 'A', 'D': 'B', 'L': 'C', 'R': 'D'} # pick unused chars
         water_heads  = {'U': 'E', 'D': 'F', 'L': 'G', 'R': 'I'}
 
         player_body = {'DU': 'q', 'LR': 'p', 'DR': 'b', 'DL': 'c', 'RU': 'd', 'LU': 'e'}
@@ -150,7 +150,7 @@ class Snakestale(Game):
         water_body  = {'DU': 'x', 'LR': 'y', 'DR': 'z', 'DL': 'f', 'RU': 'g', 'LU': 'u'}
 
         player_tail = {'U': 'T', 'D': 'J', 'L': 'K', 'R': 'N'}
-        land_tail  = {'U': 'W', 'D': 'S', 'L': 'Y', 'R': 'Z'} # pick unused chars
+        land_tail  = {'U': 'W', 'D': 'X', 'L': 'Y', 'R': 'Z'} # pick unused chars
         water_tail  = {'U': 'o', 'D': 'm', 'L': 't', 'R': 'j'}
 
         symbols = [(head_char, player_heads, player_body, player_tail),
@@ -187,7 +187,7 @@ class Snakestale(Game):
         flat = strposition.replace('\n', '')
         # Map each character back to snake index and segment role
         # Rebuild cell lists from board characters
-        player_heads = {'w', 'v', 'i', 'r'}
+        player_heads = {'^', 'v', 'i', 'r'}
         land_heads   = {'A', 'B', 'C', 'D'}
         water_heads  = {'E', 'F', 'G', 'I'}
        
@@ -223,7 +223,7 @@ class Snakestale(Game):
         player_body_chars = {'q', 'p', 'b', 'c', 'd', 'e'}
         player_tail_chars = {'T', 'J', 'K', 'N'}
         land_body_chars   = {'Q', 'P', 'M', 'n', 'H', 'V'}
-        land_tail_chars   = {'W', 'S', 'Y', 'Z'}
+        land_tail_chars   = {'W', 'X', 'Y', 'Z'}
         water_body_chars  = {'x', 'y', 'z', 'f', 'g', 'u'}
         water_tail_chars  = {'o', 'm', 't', 'j'}
 
@@ -293,8 +293,6 @@ class Snake:
         self.length = length
            
     def can_enter(self, cell: int, board) -> bool:
-        if len(self.cells) > 1 and cell == self.cells[1]:
-            return False
         if cell in self.cells[:-1]:
             return False
         if cell in board.obstacle:
@@ -322,9 +320,6 @@ class Snake:
 class PlayerSnake(Snake):
     def can_enter(self, cell, board):
         if cell == board.hole_pos:
-            for s in board.all_movable_snakes:
-                if s is not self and cell in s.cells:
-                    return False
             return True  # always allow player to enter the hole
         return super().can_enter(cell, board)
        
@@ -341,4 +336,3 @@ class LandSnake(Snake):
         if cell in board.water:
             return False
         return True
-    

@@ -3,6 +3,7 @@ from .horses import Horses
 from .pancakes import Pancakes
 from .snakestale import Snakestale
 from .chipschallenge import ChipsChallenge
+
 from .test import Test
 from models import *
 
