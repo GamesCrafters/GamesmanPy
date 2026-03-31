@@ -5,7 +5,7 @@ import math
 
 class Sokoban(Game):
     id = 'sokoban'
-    variants = ["1", "2", "3", "4", "5", "6"]
+    variants = ["1", "2", "3", "4", "5", "6", "7", "8"]
     n_players = 1
     cyclic = True 
 
@@ -97,6 +97,7 @@ class Sokoban(Game):
                     "    #########          "
                 )
             #"              "
+            #roughly 40 billion state space
             case "6":
                 self.column_size = 14
                 self.row_size = 10
@@ -111,6 +112,32 @@ class Sokoban(Game):
                     "  # $  $ $ $ #"
                     "  #    #     #"
                     "  ############"
+                )
+            case "7":
+                self.column_size = 6
+                self.row_size = 7
+                self.starting_pos = (
+                    "####  "
+                    "#@ ###"
+                    "# $$.#"
+                    "#  $.#"
+                    "# $ .#"
+                    "# # .#"
+                    "######"
+                )
+            case "8":
+                self.column_size = 9
+                self.row_size = 9
+                self.starting_pos = (
+                    " ####### "
+                    "##  *  ##"
+                    "# .@. . #"
+                    "# $ *   #"
+                    "#*$$*$$*#"
+                    "#   * $ #"
+                    "# . . . #"
+                    "##  *  ##"
+                    " ####### "
                 )
            
     def start(self) -> str:
@@ -333,12 +360,12 @@ class Sokoban(Game):
             board = [position[idx * self.column_size : (idx + 1) * self.column_size] for idx in range(self.row_size)]
             return "\n".join(board)
         elif mode == StringMode.Readable:
-            return position.replace(' ', '-').replace('#', 'W').replace("@", "p").replace("$", "b").replace("*", "g").replace("+", "P")
+            return position.replace(' ', 't').replace('#', 'W').replace("@", "p").replace("$", "b").replace("*", "g").replace("+", "P")
         else:
-            return "1_" + position.replace(' ', '-').replace('#', 'W').replace("@", "p").replace("$", "b").replace("*", "g").replace("+", "P")
+            return "1_" + position.replace(' ', 't').replace('#', 'W').replace("@", "p").replace("$", "b").replace("*", "g").replace("+", "P")
 
     def from_string(self, strposition: str) -> str:
-        clean_pos = strposition.replace('-', ' ').replace('W', '#').replace("p", "@").replace("b", "$").replace("g", "*").replace("P", "+")
+        clean_pos = strposition.replace('t', ' ').replace('W', '#').replace("p", "@").replace("b", "$").replace("g", "*").replace("P", "+")
         return clean_pos.replace("\n", "").replace("\r", "")
     
     #helper functions
