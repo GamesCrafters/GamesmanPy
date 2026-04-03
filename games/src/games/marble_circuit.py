@@ -282,6 +282,10 @@ class MarbleCircuit(Game):
 
     PYRAMID_REMOVE_MOVE_BASE = 40  # place 0..39, remove 40+slot
 
+    # Image autogui center indices (must match GamesCraftersUWAPI get_marblecircuit).
+    AUTOGUI_CONFIRM_CENTER = 90
+    AUTOGUI_REMOVE_CENTER_BASE = 91  # + slot 0..9
+
     def generate_moves(self, position: int) -> list[int]:
         if self._is_pyramid:
             board, (teal, orange, yellow, magenta), confirmed = self._decode_ch23(position)
@@ -435,24 +439,49 @@ class MarbleCircuit(Game):
             if not confirmed:
                 rows.insert(0, " o  o  o  o  o  o  o  o")
             s = "\n".join(legend + [""] + rows)
+            # Single-line key: UWAPI / GamesmanUni use Readable position in URLs; multiline breaks loads.
+            # 14 dots: 4 rem | 5 goals (targets) | 5 exit results — order matches UWAPI centers 14–27.
+            _dots = "." * 14
+            board_str = "".join(str(b) for b in board) + "TOYM" + _dots
+            goals = list(self._ch_config["exit_counts"])
+            if confirmed:
+                ex = self._get_exit_counts_ch23(board)
+                cur_parts = [str(e) for e in ex]
+            else:
+                cur_parts = ["-"] * 5
+            goal_parts = [str(g) for g in goals]
+            rem_tilde = "~".join([str(r) for r in rem] + goal_parts + cur_parts)
+            autogui_line = (
+                "1_"
+                + board_str
+                + "~"
+                + rem_tilde
+                + "_"
+                + "_".join(str(r) for r in rem)
+                + f"_{1 if confirmed else 0}"
+            )
             if mode == StringMode.AUTOGUI:
-                return "0_" + "".join(str(b) for b in board) + "_" + "_".join(str(r) for r in rem) + f"_{1 if confirmed else 0}"
+                return autogui_line
+            if mode == StringMode.Readable:
+                return autogui_line
             return s
         board, rem_s, rem_L = self._decode(position)
         lines = [f"[{board[0]}][{board[1]}]  rem: S={rem_s} L={rem_L}", f"[{board[2]}][{board[3]}]"]
         s = "\n".join(lines)
         if mode == StringMode.AUTOGUI:
-            return "0_" + "".join(str(b) for b in board) + f"_{rem_s}_{rem_L}"
+            # Use standard autogui prefix (1 = player to move) so frontend renders ImageAutoGUI.
+            return "1_" + "".join(str(b) for b in board) + f"_{rem_s}_{rem_L}"
         return s
 
     def from_string(self, strposition: str) -> int:
         s = strposition.strip()
-        if s.startswith("0_"):
+        if len(s) >= 2 and s[1] == "_" and s[0] in "012":
             s = s[2:]
         if self._is_pyramid:
             parts = s.split("_")
             if len(parts) >= 5 and len(parts[0]) >= 10:
-                board = [int(c) for c in parts[0][:10]]
+                head = parts[0].split("~")[0]
+                board = [int(head[i]) for i in range(10)]
                 rem = tuple(int(parts[i]) for i in range(1, 5))
                 confirmed = (len(parts) >= 6 and parts[5] == "1")
             else:
@@ -476,19 +505,22 @@ class MarbleCircuit(Game):
         if self._is_pyramid:
             if move == self.PYRAMID_CONFIRM_MOVE:
                 if mode == StringMode.AUTOGUI:
-                    return "C_x_x"
+                    # Default circle button (token not in charImages); ImageAutoGUI A_ parser.
+                    return f"A_c_{self.AUTOGUI_CONFIRM_CENTER}"
                 return "="
             if move >= self.PYRAMID_REMOVE_MOVE_BASE:
                 slot = move - self.PYRAMID_REMOVE_MOVE_BASE
                 if mode == StringMode.AUTOGUI:
-                    return f"R_{slot}_x"
+                    return f"A_u_{self.AUTOGUI_REMOVE_CENTER_BASE + slot}"
                 return f"{slot}-"
             slot = move // 4
             k = move % 4
             kind = ("H", "\\", "y", "x")[k]
             if mode == StringMode.AUTOGUI:
-                kind_auto = ("T", "O", "Y", "M")[k]
-                return f"M_{slot}_{kind_auto}_x"
+                # t/o/y/m = small move buttons; centers 50+4*slot+k (UWAPI). Board uses 1–4 for cells.
+                token_char = ("t", "o", "y", "m")[k]
+                center_idx = 50 + slot * 4 + k
+                return f"A_{token_char}_{center_idx}"
             return f"{slot}{kind}"
         slot = move // 8
         rest = move % 8
@@ -496,5 +528,5 @@ class MarbleCircuit(Game):
         orient = rest % 4
         kind = "S" if btype == 0 else "L"
         if mode == StringMode.AUTOGUI:
-            return f"M_{slot}_{kind}{orient}_x"
+            return f"MC_{slot}_{kind}{orient}"
         return f"({slot},{kind},{orient})"
