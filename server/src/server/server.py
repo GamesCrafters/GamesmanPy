@@ -67,16 +67,23 @@ def get_pos(game_id: str, variant_id: str):
                 "move": game.move_to_string(move, StringMode.Readable),
                 "autoguiMove": game.move_to_string(move, StringMode.AUTOGUI)
             }
-            if child_val == Value.Win:
+            if game.n_players == 1:
+                if child_val == Value.Win:
+                    item["remoteness"] = child_rem
+            else:
                 item["remoteness"] = child_rem
             move_objs.append(item)
     response = {
         'position': stringpos,
         'autoguiPosition': game.to_string(pos, StringMode.AUTOGUI),
         'positionValue': value_to_string(val),
-        'remoteness': rem,
         'moves': move_objs,
     }
+    if game.n_players == 1:
+        if val == Value.Win:
+            response["remoteness"] = rem
+    else:
+        response["remoteness"] = rem
     return response
 
 @app.errorhandler(404)
