@@ -2,6 +2,7 @@ from .clobber import Clobber
 from .horses import Horses
 from .pancakes import Pancakes
 from .chipschallenge import ChipsChallenge
+from .LunarLockout import LunarLockout
 from .test import Test
 from models import *
 
@@ -10,6 +11,8 @@ game_list = {
     "clobber": Clobber,
     "horses": Horses,
     "pancakes": Pancakes,
+    "lunarlockout": LunarLockout,
+    "chipschallenge": ChipsChallenge,
     "test": Test,
 }
 
