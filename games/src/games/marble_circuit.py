@@ -45,19 +45,517 @@ ENTRY_START_PYRAMID = [(6, TOP_LEFT), (3, TOP_LEFT), (1, TOP_LEFT), (0, TOP_LEFT
 
 # 块类型 1=T 2=O 3=Y 4=M。fixed_slots 不可 remove。
 PYRAMID_CHALLENGES: dict[str, dict] = {
+    "ch1": {
+        # Challenge 1：「H x - - x H \ y \ H」→ Solution「H x y x x H \ y \ H」
+        "fixed_slots": (0, 1, 4, 5, 6, 7, 8, 9),
+        "init_board": [1, 4, 0, 0, 4, 1, 2, 3, 2, 1],
+        "init_rem": (0, 0, 1, 1),
+        "exit_counts": [0, 5, 0, 2, 1],
+        "solution_board": [1, 4, 3, 4, 4, 1, 2, 3, 2, 1],
+    },
+    "ch2": {
+        # Challenge 2：「x H x - H x \ H - y」→ Solution「x H x y H x \ H \ y」
+        "fixed_slots": (0, 1, 2, 4, 5, 6, 7, 9),
+        "init_board": [4, 1, 4, 0, 1, 4, 2, 1, 0, 3],
+        "init_rem": (0, 1, 1, 0),
+        "exit_counts": [0, 3, 1, 4, 0],
+        "solution_board": [4, 1, 4, 3, 1, 4, 2, 1, 2, 3],
+    },
+    "ch3": {
+        # Challenge 3：「- \ H y - x H H x -」→ Solution「x \ H y \ x H H x y」
+        "fixed_slots": (1, 2, 3, 5, 6, 7, 8),
+        "init_board": [0, 2, 1, 3, 0, 4, 1, 1, 4, 0],
+        "init_rem": (0, 1, 1, 1),
+        "exit_counts": [1, 1, 1, 5, 0],
+        "solution_board": [4, 2, 1, 3, 2, 4, 1, 1, 4, 3],
+    },
+    "ch4": {
+        # Challenge 4：「y - H x - H - \ y H」→ Solution「y \ H x x H x \ y H」
+        "fixed_slots": (0, 2, 3, 5, 7, 8, 9),
+        "init_board": [3, 0, 1, 4, 0, 1, 0, 2, 3, 1],
+        "init_rem": (0, 1, 0, 2),
+        "exit_counts": [0, 1, 5, 1, 1],
+        "solution_board": [3, 2, 1, 4, 4, 1, 4, 2, 3, 1],
+    },
+    "ch5": {
+        # Challenge 5：「- - x - x H \ y H H」→ Solution「\ y x x x H \ y H H」
+        "fixed_slots": (2, 4, 5, 6, 7, 8, 9),
+        "init_board": [0, 0, 4, 0, 4, 1, 2, 3, 1, 1],
+        "init_rem": (0, 1, 1, 2),
+        "exit_counts": [0, 4, 0, 3, 1],
+        "solution_board": [2, 3, 4, 4, 4, 1, 2, 3, 1, 1],
+    },
+    "ch6": {
+        # Challenge 6：「- - y x H - \ x y H」→ Solution「\ x y x H H \ x y H」
+        "fixed_slots": (2, 3, 4, 6, 7, 8, 9),
+        "init_board": [0, 0, 3, 4, 1, 0, 2, 4, 3, 1],
+        "init_rem": (1, 1, 0, 1),
+        "exit_counts": [0, 2, 4, 1, 1],
+        "solution_board": [2, 4, 3, 4, 1, 1, 2, 4, 3, 1],
+    },
+    "ch7": {
+        # Challenge 7：「H \ H x - y - - H y」→ Solution「H \ H x x y \ x H y」
+        "fixed_slots": (0, 1, 2, 3, 5, 8, 9),
+        "init_board": [1, 2, 1, 4, 0, 3, 0, 0, 1, 3],
+        "init_rem": (0, 1, 0, 2),
+        "exit_counts": [0, 2, 3, 3, 0],
+        "solution_board": [1, 2, 1, 4, 4, 3, 2, 4, 1, 3],
+    },
+    "ch8": {
+        # Challenge 8：「y - - x \ \ H - H x」→ Solution「y H x x \ \ H y H x」
+        "fixed_slots": (0, 3, 4, 5, 6, 8, 9),
+        "init_board": [3, 0, 0, 4, 2, 2, 1, 0, 1, 4],
+        "init_rem": (1, 0, 1, 1),
+        "exit_counts": [1, 2, 3, 1, 1],
+        "solution_board": [3, 1, 4, 4, 2, 2, 1, 3, 1, 4],
+    },
+    "ch9": {
+        # Challenge 9：「x x H - y - H - H \」→ Solution「x x H y y x H \ H \」
+        "fixed_slots": (0, 1, 2, 4, 6, 8, 9),
+        "init_board": [4, 4, 1, 0, 3, 0, 1, 0, 1, 2],
+        "init_rem": (0, 1, 1, 1),
+        "exit_counts": [1, 2, 2, 1, 2],
+        "solution_board": [4, 4, 1, 3, 3, 4, 1, 2, 1, 2],
+    },
+    "ch10": {
+        # Challenge 10：「x x x - \ y - H - H」→ Solution「x x x \ \ y y H H H」
+        "fixed_slots": (0, 1, 2, 4, 5, 7, 9),
+        "init_board": [4, 4, 4, 0, 2, 3, 0, 1, 0, 1],
+        "init_rem": (2, 1, 1, 0),
+        "exit_counts": [1, 2, 2, 2, 1],
+        "solution_board": [4, 4, 4, 2, 2, 3, 3, 1, 1, 1],
+    },
+    "ch11": {
+        # Challenge 11：「- y x - - H \ - \ H」→ Solution「y y x x x H \ H \ H」
+        "fixed_slots": (1, 2, 5, 6, 8, 9),
+        "init_board": [0, 3, 4, 0, 0, 1, 2, 0, 2, 1],
+        "init_rem": (1, 0, 1, 2),
+        "exit_counts": [0, 5, 1, 1, 1],
+        "solution_board": [3, 3, 4, 4, 4, 1, 2, 1, 2, 1],
+    },
+    "ch12": {
+        # Challenge 12：「H - H x - H - \ y -」→ Solution「H \ H x x H x \ y y」
+        "fixed_slots": (0, 2, 3, 5, 7, 8),
+        "init_board": [1, 0, 1, 4, 0, 1, 0, 2, 3, 0],
+        "init_rem": (0, 1, 1, 2),
+        "exit_counts": [0, 1, 5, 2, 0],
+        "solution_board": [1, 2, 1, 4, 4, 1, 4, 2, 3, 3],
+    },
+    "ch13": {
+        # Challenge 13：「- - y - H x \ x - y」→ Solution「\ H y H H x \ x x y」
+        "fixed_slots": (2, 4, 5, 6, 7, 9),
+        "init_board": [0, 0, 3, 0, 1, 4, 2, 4, 0, 3],
+        "init_rem": (3, 1, 0, 1),
+        "exit_counts": [0, 2, 2, 4, 0],
+        "solution_board": [2, 1, 3, 1, 1, 4, 2, 4, 4, 3],
+    },
+    "ch14": {
+        # Challenge 14：「- y H - x - x x H -」→ Solution「y y H \ x \ x x H H」
+        "fixed_slots": (1, 2, 4, 6, 7, 8),
+        "init_board": [0, 3, 1, 0, 4, 0, 4, 4, 1, 0],
+        "init_rem": (1, 2, 1, 0),
+        "exit_counts": [0, 1, 4, 2, 1],
+        "solution_board": [3, 3, 1, 2, 4, 2, 4, 4, 1, 1],
+    },
+    "ch15": {
+        # Challenge 15：「x H x - y - H - y -」→ Solution「x H x x y \ H H y \」
+        "fixed_slots": (0, 1, 2, 4, 6, 8),
+        "init_board": [4, 1, 4, 0, 3, 0, 1, 0, 3, 0],
+        "init_rem": (1, 2, 0, 1),
+        "exit_counts": [1, 2, 2, 0, 3],
+        "solution_board": [4, 1, 4, 4, 3, 2, 1, 1, 3, 2],
+    },
+    "ch16": {
+        # Challenge 16：「- - y x x - - H \ H」→ Solution「y H y x x x \ H \ H」
+        "fixed_slots": (2, 3, 4, 7, 8, 9),
+        "init_board": [0, 0, 3, 4, 4, 0, 0, 1, 2, 1],
+        "init_rem": (1, 1, 1, 1),
+        "exit_counts": [0, 3, 1, 3, 1],
+        "solution_board": [3, 1, 3, 4, 4, 4, 2, 1, 2, 1],
+    },
+    "ch17": {
+        # Challenge 17：「- y - H x - - x H H」→ Solution「y y \ H x x \ x H H」
+        "fixed_slots": (1, 3, 4, 7, 8, 9),
+        "init_board": [0, 3, 0, 1, 4, 0, 0, 4, 1, 1],
+        "init_rem": (0, 2, 1, 1),
+        "exit_counts": [0, 2, 3, 2, 1],
+        "solution_board": [3, 3, 2, 1, 4, 4, 2, 4, 1, 1],
+    },
+    "ch18": {
+        # Challenge 18：「x - x y \ - - H - H」→ Solution「x H x y \ \ x H y H」
+        "fixed_slots": (0, 2, 3, 4, 7, 9),
+        "init_board": [4, 0, 4, 3, 2, 0, 0, 1, 0, 1],
+        "init_rem": (1, 1, 1, 1),
+        "exit_counts": [2, 1, 2, 2, 1],
+        "solution_board": [4, 1, 4, 3, 2, 2, 4, 1, 3, 1],
+    },
+    "ch19": {
+        # Challenge 19：「- - y \ x - H - x H」→ Solution「H \ y \ x y H x x H」
+        "fixed_slots": (2, 3, 4, 6, 8, 9),
+        "init_board": [0, 0, 3, 2, 4, 0, 1, 0, 4, 1],
+        "init_rem": (1, 1, 1, 1),
+        "exit_counts": [1, 2, 2, 2, 1],
+        "solution_board": [1, 2, 3, 2, 4, 3, 1, 4, 4, 1],
+    },
+    "ch20": {
+        # Challenge 20：「- - H x - - x H x -」→ Solution「y \ H x \ H x H x y」
+        "fixed_slots": (2, 3, 6, 7, 8),
+        "init_board": [0, 0, 1, 4, 0, 0, 4, 1, 4, 0],
+        "init_rem": (1, 2, 2, 0),
+        "exit_counts": [0, 2, 1, 5, 0],
+        "solution_board": [3, 2, 1, 4, 2, 1, 4, 1, 4, 3],
+    },
+    "ch21": {
+        # Challenge 21：「- H - \ H y \ - - -」→ Solution「x H x \ H y \ x y H」
+        "fixed_slots": (1, 3, 4, 5, 6),
+        "init_board": [0, 1, 0, 2, 1, 3, 2, 0, 0, 0],
+        "init_rem": (1, 0, 1, 3),
+        "exit_counts": [0, 2, 5, 0, 1],
+        "solution_board": [4, 1, 4, 2, 1, 3, 2, 4, 3, 1],
+    },
+    "ch22": {
+        # Challenge 22：「- \ y x - H - - x -」→ Solution「y \ y x x H \ H x H」
+        "fixed_slots": (1, 2, 3, 5, 8),
+        "init_board": [0, 2, 3, 4, 0, 1, 0, 0, 4, 0],
+        "init_rem": (2, 1, 1, 1),
+        "exit_counts": [0, 2, 1, 4, 1],
+        "solution_board": [3, 2, 3, 4, 4, 1, 2, 1, 4, 1],
+    },
     "ch23": {
+        # Challenge 23：「x - y - H y - x - -」→ Solution「x y H y x x H y x」
         "fixed_slots": (0, 1, 4, 7, 9),
         "init_board": [3, 1, 0, 0, 4, 0, 0, 2, 0, 3],
         "init_rem": (2, 1, 0, 2),
         "exit_counts": [0, 1, 4, 3, 0],
         "solution_board": [3, 1, 1, 2, 4, 4, 4, 2, 1, 3],
     },
+    "ch24": {
+        # Challenge 24：「\ H \ y - - - y - -」→ Solution「\ H \ y x x H y H x」
+        "fixed_slots": (0, 1, 2, 3, 7),
+        "init_board": [2, 1, 2, 3, 0, 0, 0, 3, 0, 0],
+        "init_rem": (2, 0, 0, 3),
+        "exit_counts": [1, 2, 0, 2, 3],
+        "solution_board": [2, 1, 2, 3, 4, 4, 1, 3, 1, 4],
+    },
+    "ch25": {
+        # Challenge 25：「x - y - H y - x - -」→ Solution「x y H y x x H y x」
+        "fixed_slots": (0, 2, 4, 5, 7),
+        "init_board": [4, 0, 3, 0, 1, 3, 0, 4, 0, 0],
+        "init_rem": (2, 2, 0, 1),
+        "exit_counts": [0, 2, 2, 3, 1],
+        "solution_board": [4, 1, 3, 2, 1, 3, 4, 4, 2, 1],
+    },
+    "ch26": {
+        # Challenge 26：「- - x - y - x H y -」→ Solution「H \ x H y \ x H y x」
+        "fixed_slots": (2, 4, 6, 7, 8),
+        "init_board": [0, 0, 4, 0, 3, 0, 4, 1, 3, 0],
+        "init_rem": (2, 2, 0, 1),
+        "exit_counts": [1, 1, 3, 1, 2],
+        "solution_board": [1, 2, 4, 1, 3, 2, 4, 1, 3, 4],
+    },
+    "ch27": {
+        # Challenge 27：「x y - - H - - x x -」→ Solution「x y y H H \ H x x \」
+        "fixed_slots": (0, 1, 4, 7, 8),
+        "init_board": [4, 3, 0, 0, 1, 0, 0, 4, 4, 0],
+        "init_rem": (2, 2, 1, 0),
+        "exit_counts": [1, 1, 2, 2, 2],
+        "solution_board": [4, 3, 3, 1, 1, 2, 1, 4, 4, 2],
+    },
+    "ch28": {
+        # Challenge 28：「\ \ H x H - - - - -」→ Solution「\ \ H x H x y y H x」
+        "fixed_slots": (0, 1, 2, 3, 4),
+        "init_board": [2, 2, 1, 4, 1, 0, 0, 0, 0, 0],
+        "init_rem": (1, 0, 2, 2),
+        "exit_counts": [1, 2, 2, 2, 1],
+        "solution_board": [2, 2, 1, 4, 1, 4, 3, 3, 1, 4],
+    },
+    "ch29": {
+        # Challenge 29：「- H - x - - - - \ y」→ Solution「y H H x x x \ H \ y」
+        "fixed_slots": (1, 3, 8, 9),
+        "init_board": [0, 1, 0, 4, 0, 0, 0, 0, 2, 3],
+        "init_rem": (2, 1, 1, 2),
+        "exit_counts": [0, 3, 0, 5, 0],
+        "solution_board": [3, 1, 1, 4, 4, 4, 2, 1, 2, 3],
+    },
+    "ch30": {
+        # Challenge 30：「- - H - H H - - y -」→ Solution「x y H \ H H x x y \」
+        "fixed_slots": (2, 4, 5, 8),
+        "init_board": [0, 0, 1, 0, 1, 1, 0, 0, 3, 0],
+        "init_rem": (0, 2, 1, 3),
+        "exit_counts": [0, 1, 5, 0, 2],
+        "solution_board": [4, 3, 1, 2, 1, 1, 4, 4, 3, 2],
+    },
+    "ch31": {
+        # Challenge 31：「- - - - H H - x x -」→ Solution「\ y H \ H H x x x y」
+        "fixed_slots": (4, 5, 7, 8),
+        "init_board": [0, 0, 0, 0, 1, 1, 0, 4, 4, 0],
+        "init_rem": (1, 2, 2, 1),
+        "exit_counts": [0, 1, 3, 4, 0],
+        "solution_board": [2, 3, 1, 2, 1, 1, 4, 4, 4, 3],
+    },
+    "ch32": {
+        # Challenge 32：「\ - x - H - - \ - -」→ Solution「\ H x H H y y \ x x」
+        "fixed_slots": (0, 2, 4, 7),
+        "init_board": [2, 0, 4, 0, 1, 0, 0, 2, 0, 0],
+        "init_rem": (2, 0, 2, 2),
+        "exit_counts": [2, 0, 4, 2, 0],
+        "solution_board": [2, 1, 4, 1, 1, 3, 3, 2, 4, 4],
+    },
+    "ch33": {
+        # Challenge 33：「\ - - H y \ - - - -」→ Solution「\ x x H y \ H H y x」
+        "fixed_slots": (0, 3, 4, 5),
+        "init_board": [2, 0, 0, 1, 3, 2, 0, 0, 0, 0],
+        "init_rem": (2, 0, 1, 3),
+        "exit_counts": [1, 1, 2, 1, 3],
+        "solution_board": [2, 4, 4, 1, 3, 2, 1, 1, 3, 4],
+    },
+    "ch34": {
+        # Challenge 34：「- - y - - - x x - x」→ Solution「H y y \ H H x x \ x」
+        "fixed_slots": (2, 6, 7, 9),
+        "init_board": [0, 0, 3, 0, 0, 0, 4, 4, 0, 4],
+        "init_rem": (3, 2, 1, 0),
+        "exit_counts": [0, 1, 3, 3, 1],
+        "solution_board": [1, 3, 3, 2, 1, 1, 4, 4, 2, 4],
+    },
+    "ch35": {
+        # Challenge 35：「\ x - H - H - - - -」→ Solution「\ x y H x H y H x \」
+        "fixed_slots": (0, 1, 3, 5),
+        "init_board": [2, 4, 0, 1, 0, 1, 0, 0, 0, 0],
+        "init_rem": (1, 1, 2, 2),
+        "exit_counts": [2, 0, 3, 1, 2],
+        "solution_board": [2, 4, 3, 1, 4, 1, 3, 1, 4, 2],
+    },
+    "ch36": {
+        # Challenge 36：「- - - x - H H y - -」→ Solution「y H \ x x H H y x \」
+        "fixed_slots": (3, 5, 6, 7),
+        "init_board": [0, 0, 0, 4, 0, 1, 1, 3, 0, 0],
+        "init_rem": (1, 2, 0, 3),
+        "exit_counts": [1, 2, 1, 2, 2],
+        "solution_board": [3, 1, 2, 4, 4, 1, 1, 3, 4, 2],
+    },
+    "ch37": {
+        # Challenge 37：「\ \ x - - - - - - x」→ Solution「\ \ x y H H H y x x」
+        "fixed_slots": (0, 1, 2, 9),
+        "init_board": [2, 2, 4, 0, 0, 0, 0, 0, 0, 4],
+        "init_rem": (3, 0, 2, 1),
+        "exit_counts": [1, 2, 2, 2, 1],
+        "solution_board": [2, 2, 4, 3, 1, 1, 1, 3, 4, 4],
+    },
+    "ch38": {
+        # Challenge 38：「- H y x - - - - - -」→ Solution「x H y x \ H \ H x y」
+        "fixed_slots": (1, 2, 3),
+        "init_board": [0, 1, 3, 4, 0, 0, 0, 0, 0, 0],
+        "init_rem": (2, 2, 1, 2),
+        "exit_counts": [0, 3, 0, 5, 0],
+        "solution_board": [4, 1, 3, 4, 2, 1, 2, 1, 4, 3],
+    },
+    "ch39": {
+        # Challenge 39：「y - H - H - - - - -」→ Solution「y y H \ H H x x x \」
+        "fixed_slots": (0, 2, 4),
+        "init_board": [3, 0, 1, 0, 1, 0, 0, 0, 0, 0],
+        "init_rem": (1, 2, 1, 3),
+        "exit_counts": [0, 1, 5, 0, 2],
+        "solution_board": [3, 3, 1, 2, 1, 1, 4, 4, 4, 2],
+    },
+    "ch40": {
+        # Challenge 40：「y \ - - \ - - - - -」→ Solution「y \ H x \ H x y x H」
+        "fixed_slots": (0, 1, 4),
+        "init_board": [3, 2, 0, 0, 2, 0, 0, 0, 0, 0],
+        "init_rem": (3, 0, 1, 3),
+        "exit_counts": [0, 2, 1, 4, 1],
+        "solution_board": [3, 2, 1, 4, 2, 1, 4, 3, 4, 1],
+    },
+    "ch41": {
+        # Challenge 41：「- \ - - H - - - - x」→ Solution「y \ H x H y x \ H x」
+        "fixed_slots": (1, 4, 9),
+        "init_board": [0, 2, 0, 0, 1, 0, 0, 0, 0, 4],
+        "init_rem": (2, 1, 2, 2),
+        "exit_counts": [0, 1, 4, 3, 0],
+        "solution_board": [3, 2, 1, 4, 1, 3, 4, 2, 1, 4],
+    },
+    "ch42": {
+        # Challenge 42：「- H - - x x - - - -」→ Solution「\ H \ y x x H y H x」
+        "fixed_slots": (1, 4, 5),
+        "init_board": [0, 1, 0, 0, 4, 4, 0, 0, 0, 0],
+        "init_rem": (2, 2, 2, 1),
+        "exit_counts": [1, 2, 0, 2, 3],
+        "solution_board": [2, 1, 2, 3, 4, 4, 1, 3, 1, 4],
+    },
+    "ch43": {
+        # Challenge 43：「- - - - x - - \ - x」→ Solution「y H y H x H \ \ x x」
+        "fixed_slots": (4, 7, 9),
+        "init_board": [0, 0, 0, 0, 4, 0, 0, 2, 0, 4],
+        "init_rem": (3, 1, 2, 1),
+        "exit_counts": [0, 2, 2, 3, 1],
+        "solution_board": [3, 1, 3, 1, 4, 1, 2, 2, 4, 4],
+    },
+    "ch44": {
+        # Challenge 44：「- y - - - x - x - -」→ Solution「H y H x \ x H x y \」
+        "fixed_slots": (1, 5, 7),
+        "init_board": [0, 3, 0, 0, 0, 4, 0, 4, 0, 0],
+        "init_rem": (3, 2, 1, 1),
+        "exit_counts": [1, 2, 3, 0, 2],
+        "solution_board": [1, 3, 1, 4, 2, 4, 1, 4, 3, 2],
+    },
+    "ch45": {
+        # Challenge 45：「- - - H \ - - - - \」→ Solution「y H H H \ x y x x \」
+        "fixed_slots": (3, 4, 9),
+        "init_board": [0, 0, 0, 1, 2, 0, 0, 0, 0, 2],
+        "init_rem": (2, 0, 2, 3),
+        "exit_counts": [2, 0, 2, 2, 2],
+        "solution_board": [3, 1, 1, 1, 2, 4, 3, 4, 4, 2],
+    },
     "ch46": {
+        # Challenge 46：「- - - H x x - - - -」→ Solution「\ \ x H x x H y y H」
         "fixed_slots": (3, 4, 5),
         "init_board": [0, 0, 0, 1, 4, 4, 0, 0, 0, 0],
         "init_rem": (2, 2, 2, 1),
         "exit_counts": [1, 2, 2, 2, 1],
         "solution_board": [2, 2, 4, 1, 4, 4, 1, 3, 3, 1],
+    },
+    "ch47": {
+        # Challenge 47：「- - - - - H - - \ -」→ Solution「y \ H x x H x y \ H」
+        "fixed_slots": (5, 8),
+        "init_board": [0, 0, 0, 0, 0, 1, 0, 0, 2, 0],
+        "init_rem": (2, 1, 2, 3),
+        "exit_counts": [0, 2, 0, 5, 1],
+        "solution_board": [3, 2, 1, 4, 4, 1, 4, 3, 2, 1],
+    },
+    "ch48": {
+        # Challenge 48：「y - - - - \ - - - -」→ Solution「y y x \ H \ x x H H」
+        "fixed_slots": (0, 5),
+        "init_board": [3, 0, 0, 0, 0, 2, 0, 0, 0, 0],
+        "init_rem": (3, 1, 1, 3),
+        "exit_counts": [0, 1, 5, 1, 1],
+        "solution_board": [3, 3, 4, 2, 1, 2, 4, 4, 1, 1],
+    },
+    "ch49": {
+        # Challenge 49：「- - - - - - - - H x」→ Solution「H y \ \ H y x x H x」
+        "fixed_slots": (8, 9),
+        "init_board": [0, 0, 0, 0, 0, 0, 0, 0, 1, 4],
+        "init_rem": (2, 2, 2, 2),
+        "exit_counts": [0, 1, 3, 4, 0],
+        "solution_board": [1, 3, 2, 2, 1, 3, 4, 4, 1, 4],
+    },
+    "ch50": {
+        # Challenge 50：「- - - - H - - - - \」→ Solution「y y H \ H x x x H \」
+        "fixed_slots": (4, 9),
+        "init_board": [0, 0, 0, 0, 1, 0, 0, 0, 0, 2],
+        "init_rem": (2, 1, 2, 3),
+        "exit_counts": [0, 1, 4, 1, 2],
+        "solution_board": [3, 3, 1, 2, 1, 4, 4, 4, 1, 2],
+    },
+    "ch51": {
+        # Challenge 51：「- - - H - - - H - -」→ Solution「\ y \ H y x x H H x」
+        "fixed_slots": (3, 7),
+        "init_board": [0, 0, 0, 1, 0, 0, 0, 1, 0, 0],
+        "init_rem": (2, 2, 2, 2),
+        "exit_counts": [1, 2, 0, 2, 3],
+        "solution_board": [2, 3, 2, 1, 3, 4, 4, 1, 1, 4],
+    },
+    "ch52": {
+        # Challenge 52：「- - - - \ x - - - -」→ Solution「y H y H \ x \ x x H」
+        "fixed_slots": (4, 5),
+        "init_board": [0, 0, 0, 0, 2, 4, 0, 0, 0, 0],
+        "init_rem": (3, 1, 2, 2),
+        "exit_counts": [0, 2, 2, 3, 1],
+        "solution_board": [3, 1, 3, 1, 2, 4, 2, 4, 4, 1],
+    },
+    "ch53": {
+        # Challenge 53：「- y - - - H - - - -」→ Solution「x y y \ H H H x x \」
+        "fixed_slots": (1, 5),
+        "init_board": [0, 3, 0, 0, 0, 1, 0, 0, 0, 0],
+        "init_rem": (2, 2, 1, 3),
+        "exit_counts": [1, 0, 3, 2, 2],
+        "solution_board": [4, 3, 3, 2, 1, 1, 1, 4, 4, 2],
+    },
+    "ch54": {
+        # Challenge 54：「- \ - - x - - - - -」→ Solution「H \ y H x H y x x \」
+        "fixed_slots": (1, 4),
+        "init_board": [0, 2, 0, 0, 4, 0, 0, 0, 0, 0],
+        "init_rem": (3, 1, 2, 2),
+        "exit_counts": [2, 2, 0, 2, 2],
+        "solution_board": [1, 2, 3, 1, 4, 1, 3, 4, 4, 2],
+    },
+    "ch55": {
+        # Challenge 55：「- - - - - - - - - x」→ Solution「y H H H x y \ x \ x」
+        "fixed_slots": (9,),
+        "init_board": [0, 0, 0, 0, 0, 0, 0, 0, 0, 4],
+        "init_rem": (3, 2, 2, 2),
+        "exit_counts": [0, 2, 1, 5, 0],
+        "solution_board": [3, 1, 1, 1, 4, 3, 2, 4, 2, 4],
+    },
+    "ch56": {
+        # Challenge 56：「- - y - - - - - - -」→ Solution「\ H y H x x y \ x H」
+        "fixed_slots": (2,),
+        "init_board": [0, 0, 3, 0, 0, 0, 0, 0, 0, 0],
+        "init_rem": (3, 2, 1, 3),
+        "exit_counts": [2, 0, 5, 0, 1],
+        "solution_board": [2, 1, 3, 1, 4, 4, 3, 2, 4, 1],
+    },
+    "ch57": {
+        # Challenge 57：「- - - - y - - - - -」→ Solution「\ x \ x y H x y H H」
+        "fixed_slots": (4,),
+        "init_board": [0, 0, 0, 0, 3, 0, 0, 0, 0, 0],
+        "init_rem": (3, 2, 1, 3),
+        "exit_counts": [0, 3, 0, 4, 1],
+        "solution_board": [2, 4, 2, 4, 3, 1, 4, 3, 1, 1],
+    },
+    "ch58": {
+        # Challenge 58：「H - - - - - - - - -」→ Solution「H H \ y H y x \ x x」
+        "fixed_slots": (0,),
+        "init_board": [1, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        "init_rem": (2, 2, 2, 3),
+        "exit_counts": [2, 1, 4, 1, 0],
+        "solution_board": [1, 1, 2, 3, 1, 3, 4, 2, 4, 4],
+    },
+    "ch59": {
+        # Challenge 59：「- - - - - - - - H -」→ Solution「y y H H x \ x x H \」
+        "fixed_slots": (8,),
+        "init_board": [0, 0, 0, 0, 0, 0, 0, 0, 1, 0],
+        "init_rem": (2, 2, 2, 3),
+        "exit_counts": [1, 1, 3, 0, 3],
+        "solution_board": [3, 3, 1, 1, 4, 2, 4, 4, 1, 2],
+    },
+    "ch60": {
+        # Challenge 60：「- - - - - - - \ - -」→ Solution「y H H H x \ y \ x x」
+        "fixed_slots": (7,),
+        "init_board": [0, 0, 0, 0, 0, 0, 0, 2, 0, 0],
+        "init_rem": (3, 1, 2, 3),
+        "exit_counts": [2, 0, 1, 3, 2],
+        "solution_board": [3, 1, 1, 1, 4, 2, 3, 2, 4, 4],
+    },
+    "ch61": {
+        # Challenge 61：「- - - - - - - - \ -」→ Solution「\ H y H x x y H \ x」
+        "fixed_slots": (8,),
+        "init_board": [0, 0, 0, 0, 0, 0, 0, 0, 2, 0],
+        "init_rem": (3, 1, 2, 3),
+        "exit_counts": [2, 1, 3, 2, 0],
+        "solution_board": [2, 1, 3, 1, 4, 4, 3, 1, 2, 4],
+    },
+    "ch62": {
+        # Challenge 62：「- - - - - - - - \ -」→ Solution「H y y x x H x H \ \」
+        "fixed_slots": (8,),
+        "init_board": [0, 0, 0, 0, 0, 0, 0, 0, 2, 0],
+        "init_rem": (3, 1, 2, 3),
+        "exit_counts": [2, 2, 2, 0, 2],
+        "solution_board": [1, 3, 3, 4, 4, 1, 4, 1, 2, 2],
+    },
+    "ch63": {
+        # Challenge 63：「- - - - - - - - - -」→ Solution「\ H y y x H x x H \」
+        "fixed_slots": (),
+        "init_board": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        "init_rem": (3, 2, 2, 3),
+        "exit_counts": [2, 4, 0, 0, 2],
+        "solution_board": [2, 1, 3, 3, 4, 1, 4, 4, 1, 2],
+    },
+    "ch64": {
+        # Challenge 64：「- - - - - - - - - -」→ Solution「H \ \ H H y y x x x」
+        "fixed_slots": (),
+        "init_board": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        "init_rem": (3, 2, 2, 3),
+        "exit_counts": [2, 2, 3, 1, 0],
+        "solution_board": [1, 2, 2, 1, 1, 3, 3, 4, 4, 4],
     },
 }
 
@@ -76,9 +574,9 @@ PYRAMID_10_TOPOLOGY: list[list[tuple[int, int] | tuple[str, int] | None]] = [
 
 
 class MarbleCircuit(Game):
-    """Marble Circuit：10 槽金字塔、4 种块不可旋转、按出口计数判胜（ch23/ch46/…）。"""
+    """Marble Circuit：10 槽金字塔、4 种块不可旋转、按出口计数判胜"""
     id = "marble_circuit"
-    variants = ["ch23", "ch46"]
+    variants = ["ch1", "ch2", "ch3", "ch4", "ch5", "ch6", "ch7", "ch8", "ch9", "ch10", "ch11", "ch12", "ch13", "ch14", "ch15", "ch16", "ch17", "ch18", "ch19", "ch20", "ch21", "ch22", "ch23", "ch24", "ch25", "ch26", "ch27", "ch28", "ch29", "ch30", "ch31", "ch32", "ch33", "ch34", "ch35", "ch36", "ch37", "ch38", "ch39", "ch40", "ch41", "ch42", "ch43", "ch44", "ch45", "ch46", "ch47", "ch48", "ch49", "ch50", "ch51", "ch52", "ch53", "ch54", "ch55", "ch56", "ch57", "ch58", "ch59", "ch60", "ch61", "ch62", "ch63", "ch64"]
     n_players = 1
     cyclic = True
 
