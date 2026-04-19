@@ -23,7 +23,8 @@ class LunarLockout(Game):
             "robots": [2, 0, 4, 20, 24],
         },
         "hard": {
-            "robots": [24, 2, 4, 10, 18, 20],
+            # "robots": [24, 2, 4, 10, 18, 20],
+            "robots": [2, 0, 4, 20, 24],
         }
     }
 
@@ -65,6 +66,9 @@ class LunarLockout(Game):
             self._move_left:  ( 0, -1),
         }
         self._current_position = 0
+        # Tracks last move
+        self._last_src = 0
+        self._last_dest = 0
 
 
     def start(self) -> int:
@@ -108,7 +112,7 @@ class LunarLockout(Game):
             if pos == self._inactive or self._is_border(pos):
                 continue
             for direction in range(4):
-                dest = self._slide(robots, robot_index, direction)
+                dest, _ = self._slide(robots, robot_index, direction)
                 if dest != pos:
                     moves.append(robot_index * 4 + direction)
         return moves
@@ -127,12 +131,18 @@ class LunarLockout(Game):
 
         if pos == self._inactive or self._is_border(pos):
             return position
-        dest = self._slide(robots, robot_index, direction)
+        src = pos
+        dest, _ = self._slide(robots, robot_index, direction)
+
         if self._is_border(dest):
             for i in range(self._robot_count):
                 if i != robot_index and robots[i] == dest:
                     robots[i] = self._inactive
+
         robots[robot_index] = dest
+
+        self._last_src = src
+        self._last_dest = dest
         return self.pack(robots)
 
 
@@ -153,12 +163,14 @@ class LunarLockout(Game):
 
     def to_string(self, position: int, mode: StringMode) -> str:
         """
-        Returns a string representation of the 7x7 board.
+        Returns a string representation of the board.
         Border cells represent space; inner cells are the playable area.
+        - AUTOGUI: "1_" + flat string (required by UI)
+        - Otherwise: flat string (used by UWAPI backend)
         """
         robots = self.unpack(position)
 
-        # Create full 7x7 board
+        # Use "." for empty cells (must match 5x5 version)
         board = [["-" for _ in range(self._cols)] for _ in range(self._rows)]
         symbols = [str(i) for i in range(self._robot_count)]
 
@@ -169,24 +181,34 @@ class LunarLockout(Game):
             col = p % self._cols
             board[row][col] = symbols[i]
 
-        if mode == StringMode.AUTOGUI:
-            return "1_" + "".join("".join(r) for r in board)
-        if mode == StringMode.Readable:
-            return "".join("".join(r) for r in board)
+        flat = "".join("".join(r) for r in board)
 
-        return "\n".join(" ".join(r) for r in board)
+        if mode == StringMode.AUTOGUI:
+            return "1_" + flat
+
+        return flat
 
 
     def from_string(self, strposition: str) -> int:
         """
-        Converts a 7x7 board string into the encoded state.
+        Converts a string position into encoded state.
+        Accepts both:
+        - "flat string"
+        - "1_flat string"
         """
         strposition = strposition.replace("\\n", "\n")
-        board = strposition.replace(" ", "").replace("\n", "")
 
-        # Must match 7x7
+        # Handle optional "1_" prefix
+        if "_" in strposition:
+            _, board = strposition.split("_", 1)
+        else:
+            board = strposition
+
+        board = board.replace(" ", "").replace("\n", "")
+
         if len(board) != self._cells:
             raise ValueError("Invalid board size")
+
         robots = [self._inactive] * self._robot_count
 
         for i, cell in enumerate(board):
@@ -198,7 +220,6 @@ class LunarLockout(Game):
                     raise ValueError("Duplicate robot in board")
                 robots[idx] = i
 
-        # Red robot must exist
         if robots[self._red_index] == self._inactive:
             raise ValueError("Red robot missing")
 
@@ -206,20 +227,22 @@ class LunarLockout(Game):
 
 
     def move_to_string(self, move: int, mode: StringMode) -> str:
-        """
-        Returns a string representation of the move based on the given mode.
-        """
         robot = move // 4
         direction = move % 4
+
         if mode == StringMode.AUTOGUI:
+            # Reconstruct position from last known state safely
             robots = self.unpack(self._current_position)
+
             src = robots[robot]
-            dest = self._slide(robots, robot, direction)
+
+            dest, _ = self._slide(robots, robot, direction)
+
             return f"M_{src}_{dest}"
-        
+
         directions = ["u", "r", "d", "l"]
         return f"{robot} {directions[direction]}"
-    
+
 
     def pack(self, robots: list[int]) -> int:
         """
@@ -270,40 +293,37 @@ class LunarLockout(Game):
         )
 
     def _slide(self, robots: list[int], robot_index: int, direction: int):
-        """
-        Slides a robot in the given direction until it hits a blocker
-        or reaches the border. Border cells are allowed and terminate movement.
-        """
         start_pos = robots[robot_index]
-        # Cannot move inactive or border robots
+
         if start_pos == self._inactive or self._is_border(start_pos):
-            return start_pos
+            return start_pos, False
 
         curr_row = start_pos // self._cols
         curr_col = start_pos % self._cols
         delta_row, delta_col = self._directions[direction]
+
         last_row = curr_row
         last_col = curr_col
 
         while True:
             next_row = curr_row + delta_row
             next_col = curr_col + delta_col
+
             if not (0 <= next_row < self._rows and 0 <= next_col < self._cols):
-                break
+                return last_row * self._cols + last_col, False
+            
             next_pos = next_row * self._cols + next_col
-            # Block only if robot is active and not in border
+            # stop at border
+            if self._is_border(next_pos):
+                return next_pos, False
+
+            # blocker
             blocked = False
             for rpos in robots:
                 if rpos == next_pos and rpos != self._inactive and not self._is_border(rpos):
-                    blocked = True
-                    break
-            if blocked:
-                break
+                    return last_row * self._cols + last_col, False
+
             curr_row = next_row
             curr_col = next_col
             last_row = curr_row
             last_col = curr_col
-            # Stop if we reach border
-            if self._is_border(next_pos):
-                break
-        return last_row * self._cols + last_col
