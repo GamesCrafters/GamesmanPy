@@ -3,7 +3,7 @@ from typing import Optional
 
 class LunarLockout(Game):
     id = 'lunarlockout'
-    board_size = ["5x5"]
+    board_size = ["7x7"]
     n_players = 1
     cyclic = False
 
@@ -26,10 +26,9 @@ class LunarLockout(Game):
             "robots": [24, 2, 4, 10, 18, 20],
         }
     }
-    # Store the variant and board dimensions (5x5).
-    # Define constants: center square index (12), removed-robot value (31), and total robots (5).
+
     # Robot index 0 always represents the red robot.
-    # Each robot position is encoded using 5 bits (values 0–31), producing a 25-bit packed state.
+    # Each robot position is encoded using 6 bits (values 0–63)
     # Prepare any movement direction offsets needed for row/column stepping.
     def __init__(self, variant_id: str):
         """
@@ -39,23 +38,25 @@ class LunarLockout(Game):
             raise ValueError("Variant not defined")
         self._variant_id = variant_id
         self._config = LunarLockout.variants[variant_id]
-
         # Board dimensions
         size_string = LunarLockout.board_size[0]
         self._rows, self._cols = map(int, size_string.split("x"))
-        self._cells = self._rows * self._cols
-        # Exit Position
-        self._center = self._cells // 2
-        # Limits
-        self._max_row = self._rows - 1
-        self._max_col = self._cols - 1
+        self._cells = self._rows * self._cols 
+        # playable region bounds
+        self._min = 1
+        self._max = self._rows - 2
+        # dynamic center (works for any odd board)
+        center_row = self._rows // 2
+        center_col = self._cols // 2
+        self._center = center_row * self._cols + center_col
+        # encoding must support positions up to 48 (7x7 board)
+        self._bits_per_robot = 6
+        self._mask = 0b111111
+        # inactive marker (must fit in mask)
+        self._inactive = 63
         # Robot configs
         self._robot_count = len(self._config["robots"])
         self._red_index = 0
-        self._removed = 31
-        # Encoding
-        self._bits_per_robot = 5
-        self._mask = 0b11111
         # Directions
         self._directions = {
             self._move_up:    (-1, 0),
@@ -66,27 +67,23 @@ class LunarLockout(Game):
         self._current_position = 0
 
 
-    # Select starting squares for all robots with no duplicates.
-    # Ensure the red robot is active and not already at a terminal condition.
-    # Keep robot ordering consistent (red first).
-    # Encode the five robot positions into a single integer state.
     def start(self) -> int:
         """
         Returns the starting position of the game.
         """
         robots = self._config["robots"].copy()
-        # Validate: red not already winning
-        if robots[self._red_index] == self._center:
-            raise ValueError("Red cannot start at exit")
         # Optional (good practice): no duplicates
         if len(set(robots)) != len(robots):
             raise ValueError("Duplicate robot positions")
-        return self.pack(robots)
+        shifted = []
+        # shifts 5x5 inside 7x7
+        for p in robots:
+            r = p // 5
+            c = p % 5
+            shifted.append((r + 1) * self._cols + (c + 1))
+        return self.pack(shifted)
 
-    # Decode the state into robot positions.
-    # Skip robots marked as removed (31).
-    # Each remaining robot can be pushed in four directions (UP, RIGHT, DOWN, LEFT).
-    # Encode moves as (robot_index * 4 + direction).
+
     def generate_moves(self, position: int) -> list[int]:
         """
         Returns a list of positions given the input position.
@@ -106,77 +103,67 @@ class LunarLockout(Game):
         moves = []
         self._current_position = position
 
-
         for robot_index in range(self._robot_count):
-            if robots[robot_index] == self._removed:
+            pos = robots[robot_index]
+            if pos == self._inactive or self._is_border(pos):
                 continue
             for direction in range(4):
-                dest, _ = self._slide(robots, robot_index, direction)
-                if dest != robots[robot_index]:
+                dest = self._slide(robots, robot_index, direction)
+                if dest != pos:
                     moves.append(robot_index * 4 + direction)
-
         return moves
 
 
-    # Decode the state and identify the robot and direction from the move.
-    # If the chosen robot is already removed, return the original state.
-    # Slide in the chosen direction while staying aligned to the same row or column.
-    # Stop when the nearest blocking robot is found.
-    # If a blocker exists, stop immediately before it.
-    # If the scan reaches the board edge with no blocker, the robot leaves the board and is marked removed (31).
-    # Do not allow two active robots to occupy the same square.
-    # Re-encode the updated positions into the new state.
     def do_move(self, position: int, move: int) -> int:
         """
-        Returns the resulting position of applying move to position.
+        Applies a move by sliding the selected robot in the given direction.
+        Robots in the border or inactive state cannot move. If a robot lands
+        in the border (space), it replaces any robot already there.
         """
         robots = self.unpack(position)
         robot_index = move // 4
         direction = move % 4
+        pos = robots[robot_index]
 
-        if robots[robot_index] == self._removed:
+        if pos == self._inactive or self._is_border(pos):
             return position
-
-        dest, left_board = self._slide(robots, robot_index, direction)
-
-        if left_board:
-            robots[robot_index] = self._removed
-        else:
-            robots[robot_index] = dest
-
+        dest = self._slide(robots, robot_index, direction)
+        if self._is_border(dest):
+            for i in range(self._robot_count):
+                if i != robot_index and robots[i] == dest:
+                    robots[i] = self._inactive
+        robots[robot_index] = dest
         return self.pack(robots)
 
-    # Decode the state.
-    # Return Win if the red robot occupies the center square (12).
-    # Return Lose if the red robot has been removed (31).
-    # Otherwise return None for a non-terminal position.
+
     def primitive(self, position: int) -> Optional[Value]:
         """
-        Returns a Value enum which defines whether the current position is a win, loss, or non-terminal. 
+        Determines if the position is terminal:
+        win if the red robot reaches the center, loss if it reaches the border,
+        otherwise the position is non-terminal.
         """
-        robot_positions = self.unpack(position)
-        red_position = robot_positions[self._red_index]
-
-        if red_position == self._center:
+        robots = self.unpack(position)
+        red = robots[self._red_index]
+        if red == self._center:
             return Value.Win
-        if red_position == self._removed:
+        if self._is_border(red):
             return Value.Loss
-        
         return None
 
-    # Convert the encoded state into a readable 5x5 board.
-    # Display the center square and all active robots.
-    # Do not display removed robots.
+
     def to_string(self, position: int, mode: StringMode) -> str:
         """
-        Returns a string representation of the position based on the given mode.
-        """ 
-        robot_positions = self.unpack(position)
+        Returns a string representation of the 7x7 board.
+        Border cells represent space; inner cells are the playable area.
+        """
+        robots = self.unpack(position)
+
+        # Create full 7x7 board
         board = [["-" for _ in range(self._cols)] for _ in range(self._rows)]
         symbols = [str(i) for i in range(self._robot_count)]
 
-        for i, p in enumerate(robot_positions):
-            if p == self._removed:
+        for i, p in enumerate(robots):
+            if p == self._inactive:
                 continue
             row = p // self._cols
             col = p % self._cols
@@ -189,80 +176,61 @@ class LunarLockout(Game):
 
         return "\n".join(" ".join(r) for r in board)
 
-    # Parse a readable board layout into robot positions.
-    # Validate positions are within bounds and not duplicated.
-    # Assign removed status to any robot not present.
-    # Encode the positions into an integer state.
+
     def from_string(self, strposition: str) -> int:
         """
-        Converts a readable board string into the encoded state.
+        Converts a 7x7 board string into the encoded state.
         """
         strposition = strposition.replace("\\n", "\n")
         board = strposition.replace(" ", "").replace("\n", "")
 
-        # Validate board size
+        # Must match 7x7
         if len(board) != self._cells:
             raise ValueError("Invalid board size")
-
-        robots = [self._removed] * self._robot_count
-
+        robots = [self._inactive] * self._robot_count
 
         for i, cell in enumerate(board):
             if cell.isdigit():
                 idx = int(cell)
-                # Reject robots outside allowed range
                 if idx >= self._robot_count:
                     raise ValueError("Invalid robot index")
-                # Check duplicate robot
-                if robots[idx] != self._removed:
+                if robots[idx] != self._inactive:
                     raise ValueError("Duplicate robot in board")
                 robots[idx] = i
 
         # Red robot must exist
-        if robots[self._red_index] == self._removed:
+        if robots[self._red_index] == self._inactive:
             raise ValueError("Red robot missing")
 
         return self.pack(robots)
 
 
-    # Decode the move into robot index and direction.
-    # Return a readable description of the movement direction.
     def move_to_string(self, move: int, mode: StringMode) -> str:
         """
         Returns a string representation of the move based on the given mode.
         """
         robot = move // 4
         direction = move % 4
-
         if mode == StringMode.AUTOGUI:
             robots = self.unpack(self._current_position)
-
             src = robots[robot]
-            dest, _ = self._slide(robots, robot, direction)
-
+            dest = self._slide(robots, robot, direction)
             return f"M_{src}_{dest}"
-
+        
         directions = ["u", "r", "d", "l"]
         return f"{robot} {directions[direction]}"
     
 
     def pack(self, robots: list[int]) -> int:
         """
-        Takes the 5 robot positions and compresses them into one binary.
-
-        robots must be a list in this exact order:
-        [red, helper1, helper2, helper3, helper4]
-
-        Each robot position is a number:
-        0-24 = a square on the board
-        31   = the robot has been removed
-
-        We store each position using 5 bits.
+        Compresses robot positions into a single integer.
+        Each robot position is stored using 6 bits (values 0–63),
+        allowing representation of the full 7x7 board plus inactive state.
         """
         state = 0
         # Add each robot position into the integer one at a time.
         # Shifting left makes space for the next robot, and the OR
-        # places the new value into those 5 empty bits.
+        # places the new value into those 6 empty bits.
         for position in robots:
             if position < 0 or position > self._mask:
                 raise ValueError("Invalid robot position")
@@ -272,58 +240,70 @@ class LunarLockout(Game):
 
     def unpack(self, state: int) -> list[int]:
         """
-        Reverses pack(): takes the encoded binary and recovers the
-        original robot positions.
-
-        Returns a list:
-        [red, helper1, helper2, helper3, helper4]
-
-        The function repeatedly reads the last 5 bits of the number to
-        get a robot position, then shifts the number right to remove
-        those bits.
+        Reverses pack(): extracts robot positions from the encoded integer.
+        Each robot position occupies 6 bits.
         """
         robots = [0] * self._robot_count
 
         # Read robot locations backwards because the last robot inserted
-        # is stored in the lowest 5 bits of the integer.
+        # is stored in the lowest 6 bits of the integer.
         for i in range(self._robot_count - 1, -1, -1):
-            robots[i] = state & self._mask  # get last 5 bits
+            robots[i] = state & self._mask  # get last 6 bits
             state >>= self._bits_per_robot  # discard those bits
         return robots
 
+    def _is_border(self, pos: int) -> bool:
+        """
+        Returns True if the position is on the outer edge of the board.
+        Border cells represent space (terminal region) and are not part of the playable area.
+        """
+
+        if pos == self._inactive:
+            return False
+
+        row = pos // self._cols
+        col = pos % self._cols
+
+        return (
+            row == 0 or row == self._rows - 1 or
+            col == 0 or col == self._cols - 1
+        )
 
     def _slide(self, robots: list[int], robot_index: int, direction: int):
+        """
+        Slides a robot in the given direction until it hits a blocker
+        or reaches the border. Border cells are allowed and terminate movement.
+        """
         start_pos = robots[robot_index]
+        # Cannot move inactive or border robots
+        if start_pos == self._inactive or self._is_border(start_pos):
+            return start_pos
 
         curr_row = start_pos // self._cols
         curr_col = start_pos % self._cols
-
         delta_row, delta_col = self._directions[direction]
-
-        last_valid_row = curr_row
-        last_valid_col = curr_col
-        exited_board = False
+        last_row = curr_row
+        last_col = curr_col
 
         while True:
             next_row = curr_row + delta_row
             next_col = curr_col + delta_col
-
-            # Check if next step goes off the board
             if not (0 <= next_row < self._rows and 0 <= next_col < self._cols):
-                exited_board = True
                 break
-
             next_pos = next_row * self._cols + next_col
-
-            # Check if next position is occupied by another robot
-            if next_pos in robots and next_pos != start_pos:
+            # Block only if robot is active and not in border
+            blocked = False
+            for rpos in robots:
+                if rpos == next_pos and rpos != self._inactive and not self._is_border(rpos):
+                    blocked = True
+                    break
+            if blocked:
                 break
-
-            # Advance to next valid position
-            last_valid_row = next_row
-            last_valid_col = next_col
             curr_row = next_row
             curr_col = next_col
-
-        end_pos = last_valid_row * self._cols + last_valid_col
-        return end_pos, exited_board
+            last_row = curr_row
+            last_col = curr_col
+            # Stop if we reach border
+            if self._is_border(next_pos):
+                break
+        return last_row * self._cols + last_col
