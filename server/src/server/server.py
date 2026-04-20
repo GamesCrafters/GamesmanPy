@@ -47,9 +47,12 @@ def get_pos(game_id: str, variant_id: str):
     if entry is None:
         abort(404, "Position not in database.")
     (rem, val) = entry
+
     moves = []
+
     if game.primitive(pos) is None:
-        moves = game.generate_moves(pos)
+        moves =  game.generate_moves(pos)
+    
     move_objs = []
     for move in moves:
         new_pos = game.do_move(pos, move)
@@ -57,14 +60,16 @@ def get_pos(game_id: str, variant_id: str):
         child = db.get(new_hashed_pos)
         if child is not None:
             (child_rem, child_val) = child
-            move_objs.append({
+            item = {
                 "position": game.to_string(new_pos, StringMode.Readable),
                 "autoguiPosition": game.to_string(new_pos, StringMode.AUTOGUI),
                 "positionValue": value_to_string(child_val),
                 "move": game.move_to_string(move, StringMode.Readable),
-                "autoguiMove": game.move_to_string(move, StringMode.AUTOGUI),
-                "remoteness": child_rem,
-            })
+                "autoguiMove": game.move_to_string(move, StringMode.AUTOGUI)
+            }
+            if child_val == Value.Win:
+                item["remoteness"] = child_rem
+            move_objs.append(item)
     response = {
         'position': stringpos,
         'autoguiPosition': game.to_string(pos, StringMode.AUTOGUI),
