@@ -6,25 +6,35 @@ class LunarLockout(Game):
     board_size = ["7x7"]
     n_players = 1
     cyclic = False
-
     _move_up = 0
     _move_right = 1
     _move_down = 2
     _move_left = 3
 
     variants = {
-        "beginner": {
-            "robots": [20, 7, 16, 0, 23],
+        "beginner-1": {
+            "robots": [24, 4, 7, 11, 18],
         },
-        "easy": {
+        "beginner-2": {
+            "robots": [21, 2, 9, 11, 18]
+        },
+        "easy-16": {
+            "robots": [2, 0, 11, 14, 21],
+        },
+        "easy-17": {
             "robots": [21, 2, 4, 11, 18],
         },
-        "medium": {
+        "medium-28": {
             "robots": [2, 0, 4, 20, 24],
         },
-        "hard": {
-            # "robots": [24, 2, 4, 10, 18, 20],
-            "robots": [2, 0, 4, 20, 24],
+        "medium-29": {
+            "robots": [24, 1, 4, 14, 15]
+        },
+        "hard-34": {
+            "robots": [24, 2, 4, 10, 18, 20],
+        },
+        "hard-35": {
+            "robots": [2, 0, 4, 7, 20, 24],
         }
     }
 
