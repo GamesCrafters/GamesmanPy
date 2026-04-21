@@ -54,25 +54,55 @@ def get_pos(game_id: str, variant_id: str):
         moves =  game.generate_moves(pos)
     
     move_objs = []
-    for move in moves:
-        new_pos = game.do_move(pos, move)
-        new_hashed_pos = game.hash_ext(new_pos)
-        child = db.get(new_hashed_pos)
-        if child is not None:
-            (child_rem, child_val) = child
-            item = {
-                "position": game.to_string(new_pos, StringMode.Readable),
-                "autoguiPosition": game.to_string(new_pos, StringMode.AUTOGUI),
-                "positionValue": value_to_string(child_val),
-                "move": game.move_to_string(move, StringMode.Readable),
-                "autoguiMove": game.move_to_string(move, StringMode.AUTOGUI)
-            }
-            if game.n_players == 1:
-                if child_val == Value.Win:
+    if game.uses_half_moves:
+        move_dict = {}
+        for move in moves:
+            new_pos = game.do_move(pos, move)
+            new_hashed_pos = game.hash_ext(new_pos)
+            child = db.get(new_hashed_pos)
+            if child is not None:
+                move_dict[move] = child
+        half_moves = game.generate_half_moves(pos)
+        for half_move in half_moves:
+            # This function should return the same remoteness as its parent
+            # if the move is not complete. If it returns a full position 
+            # because of a full move, it should return the new remoteness
+            new_half_pos, half_move_val, half_pos_rem, half_pos_val = game.do_half_move(pos, half_move, move_dict)
+            if new_half_pos is not None:
+                item = {
+                    "position": game.to_string(new_half_pos, StringMode.Readable),
+                    "autoguiPosition": game.to_string(new_half_pos, StringMode.AUTOGUI),
+                    "positionValue": value_to_string(half_pos_val),
+                    "move": game.move_to_string(half_move, StringMode.Readable),
+                    "autoguiMove": game.move_to_string(half_move, StringMode.AUTOGUI),
+                    "moveValue": value_to_string(half_move_val)
+                }
+                if game.n_players == 1:
+                    if half_pos_val == Value.Win:
+                        item["remoteness"] = half_pos_rem
+                else:
+                    item["remoteness"] = half_pos_rem
+                move_objs.append(item)
+    else:
+        for move in moves:
+            new_pos = game.do_move(pos, move)
+            new_hashed_pos = game.hash_ext(new_pos)
+            child = db.get(new_hashed_pos)
+            if child is not None:
+                (child_rem, child_val) = child
+                item = {
+                    "position": game.to_string(new_pos, StringMode.Readable),
+                    "autoguiPosition": game.to_string(new_pos, StringMode.AUTOGUI),
+                    "positionValue": value_to_string(child_val),
+                    "move": game.move_to_string(move, StringMode.Readable),
+                    "autoguiMove": game.move_to_string(move, StringMode.AUTOGUI)
+                }
+                if game.n_players == 1:
+                    if child_val == Value.Win:
+                        item["remoteness"] = child_rem
+                else:
                     item["remoteness"] = child_rem
-            else:
-                item["remoteness"] = child_rem
-            move_objs.append(item)
+                move_objs.append(item)
     response = {
         'position': stringpos,
         'autoguiPosition': game.to_string(pos, StringMode.AUTOGUI),
