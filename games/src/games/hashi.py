@@ -10,7 +10,7 @@ puzzles = {
         (2, 2, 1),
         (3, 3, 1)
     ],
-    "6x6": [
+    "6x6_lvl1": [
         (0, 0, 2),
         (3, 0, 4), 
         (5, 0, 2), 
@@ -20,12 +20,15 @@ puzzles = {
         (5, 4, 2), 
         (0, 5, 2), 
         (2, 5, 1)
-    ]
+    ],
+    "6x6_lvl2": [ (0, 0, 2), (2, 0, 3), (5, 0, 3), (4, 1, 1), (0, 2, 4), (2, 2, 4), (5, 2, 3), (2, 4, 1), (5, 4, 1), (0, 5, 3), (4, 5, 3)],
+    "6x6_lvl3": [ (0, 0, 3), (4, 0, 3), (1, 1, 3), (3, 1, 2), (5, 1, 2), (3, 3, 1), (1, 4, 3), (4, 4, 2), (0, 5, 2), (5, 5, 3) ],
+    "7x5": [ (0, 0, 2), (2, 0, 4), (4, 0, 4), (6, 0, 2), (0, 2, 4), (2, 2, 2), (4, 2, 2), (6, 2, 4), (0, 4, 4), (2, 4, 2), (4, 4, 1), (6, 4, 3) ]
 }
 
 class Hashi(Game):
     id = 'hashi'
-    variants = ["4x4", "6x6"]
+    variants = ["4x4", "6x6_lvl1", "6x6_lvl2", "6x6_lvl3", "7x5"]
     n_players = 1
     cyclic = True
 
@@ -141,7 +144,6 @@ class Hashi(Game):
         
         return None
 
-
     def to_string(self, position: int, mode: StringMode) -> str:
         """
         Returns a string representation of the position with coordinate visualization.
@@ -156,10 +158,28 @@ class Hashi(Game):
             height = (max_y * 2) + 1
             gui_array = ["-"] * (width * height)
 
+            node_degrees = {(x, y): 0 for x, y, val in nodes}
+            for i, ((x1, y1), (x2, y2)) in enumerate(self.edges):
+                bridges = (position // (3 ** i)) % 3
+                if bridges > 0:
+                    node_degrees[(x1, y1)] += bridges
+                    node_degrees[(x2, y2)] += bridges
+
             # islands
+            satisfied_chars = "abcdefgi"
+            over_chars = "ABCDEFGI"
+            
             for x, y, val in nodes:
+                curr = node_degrees[(x, y)]
+                if curr == val:
+                    char = satisfied_chars[val - 1]
+                elif curr > val:
+                    char = over_chars[val - 1]
+                else:
+                    char = str(val)
+
                 idx = (y * 2) * width + (x * 2)
-                gui_array[idx] = str(val)
+                gui_array[idx] = char
 
             # edge midpoints
             for i, ((x1, y1), (x2, y2)) in enumerate(self.edges):
