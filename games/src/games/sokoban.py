@@ -5,7 +5,7 @@ import math
 
 class Sokoban(Game):
     id = 'sokoban'
-    variants = ["1", "2", "3", "4", "5", "6", "7", "8"]
+    variants = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"]
     n_players = 1
     cyclic = True 
 
@@ -97,9 +97,95 @@ class Sokoban(Game):
                     "    #########          "
                 )
                 
-            #"              "
-            #roughly 40 billion state space
             case "6":
+                self.column_size = 9
+                self.row_size = 8
+                self.starting_pos = (
+                    "  ####   "
+                    "  #  #   "
+                    "###  ####"
+                    "#  +*   #"
+                    "# $.. $ #"
+                    "### $####"
+                    "  #  #   "
+                    "  ####   "
+                )
+
+            case "7":
+                self.column_size = 6
+                self.row_size = 7
+                self.starting_pos = (
+                    "####  "
+                    "#@ ###"
+                    "# $$.#"
+                    "#  $.#"
+                    "# $ .#"
+                    "# # .#"
+                    "######"
+                )
+            
+            case "8":
+                self.column_size = 9
+                self.row_size = 8
+                self.starting_pos = (
+                    "   ##### "
+                    "####.  ##"
+                    "# $.$.  #"
+                    "#@$# #$ #"
+                    "# $. .  #"
+                    "####$#$ #"
+                    "  #. .  #"
+                    "  #######"
+                )
+
+            case "9":
+                self.column_size = 9
+                self.row_size = 8
+                self.starting_pos = (
+                    "   ######"
+                    "####.  @#"
+                    "#  $$$  #"
+                    "#.##.##.#"
+                    "#   $   #"
+                    "#  $.# ##"
+                    "###    # "
+                    "  ###### "
+                )
+
+            case "10":
+                self.column_size = 11
+                self.row_size = 9
+                self.starting_pos = (
+                    "  #########"
+                    "###   #   #"
+                    "#  $. * $ #"
+                    "# #.#.#.# #"
+                    "# $ $@$ $ #"
+                    "# #.#.#.# #"
+                    "# $ * .$  #"
+                    "#   #######"
+                    "#####      "
+                )
+
+            # roughly 28.7 billion states
+            case "11":
+                self.column_size = 9
+                self.row_size = 9
+                self.starting_pos = (
+                    " ####### "
+                    "##  *  ##"
+                    "# .@. . #"
+                    "# $ *   #"
+                    "#*$$*$$*#"
+                    "#   * $ #"
+                    "# . . . #"
+                    "##  *  ##"
+                    " ####### "
+                )
+            
+                        #"              "
+            #roughly 40 billion state space
+            case "12":
                 self.column_size = 14
                 self.row_size = 10
                 self.starting_pos = (
@@ -114,32 +200,6 @@ class Sokoban(Game):
                     "  #    #     #"
                     "  ############"
                 )
-            case "7":
-                self.column_size = 6
-                self.row_size = 7
-                self.starting_pos = (
-                    "####  "
-                    "#@ ###"
-                    "# $$.#"
-                    "#  $.#"
-                    "# $ .#"
-                    "# # .#"
-                    "######"
-                )
-            case "8":
-                self.column_size = 9
-                self.row_size = 9
-                self.starting_pos = (
-                    " ####### "
-                    "##  *  ##"
-                    "# .@. . #"
-                    "# $ *   #"
-                    "#*$$*$$*#"
-                    "#   * $ #"
-                    "# . . . #"
-                    "##  *  ##"
-                    " ####### "
-                )
            
     def start(self) -> str:
         """Returns the starting position of the game."""
@@ -148,43 +208,45 @@ class Sokoban(Game):
     def generate_moves(self, position: str) -> list[tuple]:
         """
         Returns a list of only the moves that push a box: (box_idx, dx, dy)
-        
         """
         moves = []
         
         p_idx = self.get_pos_idx(position)
-            
         px, py = p_idx % self.column_size, p_idx // self.column_size
         
         reachable = set()
+        reachable.add((px, py))
         queue = [(px, py)]
+        head = 0 
         
-        while queue:
-            curr_x, curr_y = queue.pop(0)
-            if (curr_x, curr_y) not in reachable:
-                reachable.add((curr_x, curr_y))
-                
-                for dx, dy in self.dxdy:
-                    nx, ny = curr_x + dx, curr_y + dy
-                    if 0 <= nx < self.column_size and 0 <= ny < self.row_size:
+        while head < len(queue):
+            curr_x, curr_y = queue[head]
+            head += 1 
+            
+            for dx, dy in self.dxdy:
+                nx, ny = curr_x + dx, curr_y + dy
+                if 0 <= nx < self.column_size and 0 <= ny < self.row_size:
+                    if (nx, ny) not in reachable:
                         n_idx = ny * self.column_size + nx
                         if position[n_idx] in [' ', '.']:
+                            reachable.add((nx, ny))
                             queue.append((nx, ny))
-        
-        # O(nm) check
-        for y in range(self.row_size):
-            for x in range(self.column_size):
-                idx = y * self.column_size + x
-                if position[idx] in ['$', '*']: 
-                    for dx, dy in self.dxdy:
-                        player_req_x, player_req_y = x - dx, y - dy
-                        push_target_x, push_target_y = x + dx, y + dy
-                        
-                        if (player_req_x, player_req_y) in reachable:
-                            if 0 <= push_target_x < self.column_size and 0 <= push_target_y < self.row_size:
-                                target_idx = push_target_y * self.column_size + push_target_x
-                                if position[target_idx] in [' ', '.', '@', '+']:
-                                    moves.append((idx, dx, dy))
+
+        for idx, char in enumerate(position):
+            if char in ['$', '*']: 
+                x = idx % self.column_size
+                y = idx // self.column_size
+                
+                for dx, dy in self.dxdy:
+                    player_req_x, player_req_y = x - dx, y - dy
+                    push_target_x, push_target_y = x + dx, y + dy
+                    
+                    if (player_req_x, player_req_y) in reachable:
+                        if 0 <= push_target_x < self.column_size and 0 <= push_target_y < self.row_size:
+                            target_idx = push_target_y * self.column_size + push_target_x
+                            if position[target_idx] in [' ', '.', '@', '+']:
+                                moves.append((idx, dx, dy))
+                                
         return moves
 
     def do_move(self, position: str, move: tuple) -> str:
