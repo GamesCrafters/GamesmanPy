@@ -151,7 +151,7 @@ class Sokoban(Game):
                     "###    # "
                     "  ###### "
                 )
-
+ 
             case "10":
                 self.column_size = 7
                 self.row_size = 7
