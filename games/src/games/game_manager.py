@@ -4,12 +4,14 @@ from .pancakes import Pancakes
 from .chipschallenge import ChipsChallenge
 from .test import Test
 from models import *
+from .LunarLockout import LunarLockout
 
 game_list = {
     "chipschallenge": ChipsChallenge,
     "clobber": Clobber,
     "horses": Horses,
     "pancakes": Pancakes,
+    "lunar_lockout": LunarLockout,
     "test": Test,
 }
 
