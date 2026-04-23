@@ -153,6 +153,20 @@ class Sokoban(Game):
                 )
 
             case "10":
+                self.column_size = 7
+                self.row_size = 7
+                self.starting_pos = (
+                    "#######"
+                    "#. . .#"
+                    "# $$$ #"
+                    "#.$@$.#"
+                    "# $$$ #"
+                    "#. . .#"
+                    "#######"
+                )
+
+            # roughly 4 billion states
+            case "11":
                 self.column_size = 11
                 self.row_size = 9
                 self.starting_pos = (
@@ -168,7 +182,7 @@ class Sokoban(Game):
                 )
 
             # roughly 28.7 billion states
-            case "11":
+            case "12":
                 self.column_size = 9
                 self.row_size = 9
                 self.starting_pos = (
@@ -185,7 +199,7 @@ class Sokoban(Game):
             
                         #"              "
             #roughly 40 billion state space
-            case "12":
+            case "13":
                 self.column_size = 14
                 self.row_size = 10
                 self.starting_pos = (
