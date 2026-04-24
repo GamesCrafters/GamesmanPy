@@ -47,11 +47,12 @@ class Klotski(Game):
         self.BOT_EDGE = sum(1 << c for c in (3,2,1,0))
         self.BOARD_MASK = (1 << 20) - 1
 
-        # group boundaries in decode order (LSB->MSB): 11, 12, 21, 22
         self.end11 = self.num11
         self.end12 = self.num11 + self.num12
         self.end21 = self.num11 + self.num12 + self.num21
         self.end22 = self.numPieces
+
+        self._current_pos = self.start()
 
     def start(self) -> int:
         """
@@ -62,40 +63,35 @@ class Klotski(Game):
         elif (self._variant_id == "pennant"):
             return 0b10011_00111_00110_10001_01101_00101_00001_01011_01010
         
-        # invalid variant
         raise ValueError("Variant not defined")
     
     def generate_moves(self, position: int) -> list[int]:
         """
         Returns a list of positions given the input position.
         """
+
+        self._current_pos = position
+        
         bitboard = 0
         moveList = []
 
         for i in range(self.numPieces):
-            # Populate bitboard
             pieceLocation = (position >> (i*5)) & 0b11111
-            pieceType = 0
             if (i < self.num11):
-                # 1 by 1 piece
                 bitboard |= 1 << pieceLocation
             elif (i < self.num11 + self.num12):
-                # 1 by 2 piece
                 bitboard |= 1 << pieceLocation
                 bitboard |= 1 << (pieceLocation - 1)
             elif (i < self.num11 + self.num12 + self.num21):
-                # 2 by 1 piece
                 bitboard |= 1 << pieceLocation
                 bitboard |= 1 << (pieceLocation - 4)
             else:
-                # 2 by 2 piece
                 bitboard |= 1 << pieceLocation
                 bitboard |= 1 << (pieceLocation - 1)
                 bitboard |= 1 << (pieceLocation - 4)
                 bitboard |= 1 << (pieceLocation - 5)
 
         for i in range(self.numPieces):
-            # Figure out the piece type and location
             pieceLocation = (position >> (i*5)) & 0b11111
             pieceMask = 0
             if (i < self.num11):
@@ -112,39 +108,27 @@ class Klotski(Game):
                 pieceMask |= 1 << (pieceLocation - 4)
                 pieceMask |= 1 << (pieceLocation - 5)
 
-            # Up movement
             shiftedMask = (pieceMask << 4) & self.BOARD_MASK
             if (((bitboard & ~pieceMask) & shiftedMask) == 0):
-                # Check border
                 if (pieceMask & self.TOP_EDGE) == 0:
-                    # Add move to list of moves
                     moveCode = (i << 2) + self.MOVE_CODE_UP
                     moveList.append(moveCode)
 
-            # Down movement
             shiftedMask = pieceMask >> 4
             if (((bitboard & ~pieceMask) & shiftedMask) == 0):
-                # Check border
                 if (pieceMask & self.BOT_EDGE) == 0:
-                    # Add move to list of moves
                     moveCode = (i << 2) + self.MOVE_CODE_DOWN
                     moveList.append(moveCode)
 
-            # Left movement
             shiftedMask = (pieceMask << 1) & self.BOARD_MASK
             if (((bitboard & ~pieceMask) & shiftedMask) == 0):
-                # Check border
                 if (pieceMask & self.LEFT_EDGE) == 0:
-                    # Add move to list of moves
                     moveCode = (i << 2) + self.MOVE_CODE_LEFT
                     moveList.append(moveCode)
 
-            # Right movement
             shiftedMask = pieceMask >> 1
             if (((bitboard & ~pieceMask) & shiftedMask) == 0):
-                # Check border
                 if (pieceMask & self.RIGHT_EDGE) == 0:
-                    # Add move to list of moves
                     moveCode = (i << 2) + self.MOVE_CODE_RIGHT
                     moveList.append(moveCode)
 
@@ -173,7 +157,6 @@ class Klotski(Game):
 
         newpos = self._set_anchor(position, piece_index, na)
 
-        
         return self._canonicalize(newpos)
 
     def primitive(self, position: int) -> Optional[Value]:
@@ -241,7 +224,7 @@ class Klotski(Game):
             flat = strposition.strip()
 
         if len(flat) == 20:
-            pass  # already the flat format
+            pass
         else:
             raise ValueError(f"Expected 20 characters, got {len(flat)}: {repr(flat)}")
 
@@ -268,39 +251,12 @@ class Klotski(Game):
             pos |= (a & 0b11111) << (5 * i)
         return pos 
 
-    # def move_to_string(self, move: int, mode: StringMode, position: int = 0) -> str:
-    #     i = move >> 2
-    #     d = move & 0b11
-
-    #     if mode == StringMode.AUTOGUI:
-    #         a = self._get_anchor(position, i)
-    #         from_idx = self._center_index(i, a)
-
-    #         if d == self.MOVE_CODE_UP:
-    #             to_idx = self._center_index(i, a + 4)
-    #             char = '↑'
-    #         elif d == self.MOVE_CODE_DOWN:
-    #             to_idx = self._center_index(i, a - 4)
-    #             char = '↓'
-    #         elif d == self.MOVE_CODE_LEFT:
-    #             to_idx = self._center_index(i, a + 1)
-    #             char = '←'
-    #         else:
-    #             to_idx = self._center_index(i, a - 1)
-    #             char = '→'
-    #         return f"M_{from_idx}_{to_idx}_{char}"
-
-    #     iChar = chr(ord('A') + i)
-    #     dChar = {self.MOVE_CODE_UP: "U", self.MOVE_CODE_DOWN: "D",
-    #             self.MOVE_CODE_LEFT: "L", self.MOVE_CODE_RIGHT: "R"}[d]
-    #     return f"{iChar}{dChar}"
-
-    def move_to_string(self, move: int, mode: StringMode, position: int = 0) -> str:
+    def move_to_string(self, move: int, mode: StringMode) -> str:
         i = move >> 2
         d = move & 0b11
 
         if mode == StringMode.AUTOGUI:
-            a = self._get_anchor(position, i)
+            a = self._get_anchor(self._current_pos, i)
             autogui_a = 19 - a
             row = autogui_a // 4
             col = autogui_a % 4
@@ -362,8 +318,6 @@ class Klotski(Game):
         dChar = {self.MOVE_CODE_UP: "U", self.MOVE_CODE_DOWN: "D",
                 self.MOVE_CODE_LEFT: "L", self.MOVE_CODE_RIGHT: "R"}[d]
         return f"{iChar}{dChar}"
-    
-    # ---------- helpers ----------
 
     def _get_anchor(self, position: int, i: int) -> int:
         return (position >> (5 * i)) & 0b11111
@@ -398,7 +352,6 @@ class Klotski(Game):
         """
         anchors = [self._get_anchor(position, i) for i in range(self.numPieces)]
 
-        # groups: [0,end11), [end11,end12), [end12,end21), [end21,end22)
         anchors[0:self.end11] = sorted(anchors[0:self.end11])
         anchors[self.end11:self.end12] = sorted(anchors[self.end11:self.end12])
         anchors[self.end12:self.end21] = sorted(anchors[self.end12:self.end21])
@@ -431,10 +384,10 @@ class Klotski(Game):
         col = autogui % 4
 
         if i < self.end11:
-            return autogui                    # 1x1: use cell center directly
+            return autogui
         elif i < self.end12:
-            return 20 + col * 5 + row         # 1x2 horizontal
+            return 20 + col * 5 + row
         elif i < self.end21:
-            return 35 + col * 4 + row         # 2x1 vertical
+            return 35 + col * 4 + row
         else:
-            return 51 + col * 4 + row         # 2x2
+            return 51 + col * 4 + row
