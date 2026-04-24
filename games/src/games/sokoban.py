@@ -5,7 +5,7 @@ import math
 
 class Sokoban(Game):
     id = 'sokoban'
-    variants = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"]
+    variants = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"]
     n_players = 1
     cyclic = True 
 
@@ -24,16 +24,18 @@ class Sokoban(Game):
 
         match self._variant_id:
             case "1": # equivalent to Level 1 from the online Sokoban player
-                self.column_size = 6
-                self.row_size = 7
+                self.column_size = 8
+                self.row_size = 9
                 self.starting_pos = (
-                    "##   #"
-                    ".@$  #"
-                    "## $.#"
-                    ".##$ #"
-                    " # . #"
-                    "$ *$$."
-                    "   .  "
+                    "########"
+                    "###   ##"
+                    "#.@$  ##"
+                    "### $.##"
+                    "#.##$ ##"
+                    "# # . ##"
+                    "#$ *$$.#"
+                    "#   .  #"
+                    "########"
                 )
             case "2":
                 self.column_size = 8
@@ -288,31 +290,60 @@ class Sokoban(Game):
         return "".join(pos_list)
 
     def primitive(self, position: str) -> Optional[Value]:
-        """
-        Returns Value.Win if all boxes are on goals.
-        Returns Value.Lose if any box is deadlocked in a corner.
-        Otherwise returns None.
-        """
         if position.find('$') == -1:
             return Value.Win
-        
-        all_boxes = set()
-        for i, char in enumerate(position):
-            if char in ['$', '*']:
-                all_boxes.add(i)
 
-        
-        for y in range(self.row_size):
-            for x in range(self.column_size):
-                idx = y * self.column_size + x
+        # Cache for slightly faster local lookups
+        immobile = {'#', '$', '*'}
+        col = self.column_size
+        row = self.row_size
+
+        for y in range(row):
+            for x in range(col):
+                idx = y * col + x
+                
+                # We ONLY care about running checks if we land on an active box
                 if position[idx] == '$':
-                    up = (y == 0) or (position[(y - 1) * self.column_size + x] == '#')
-                    down = (y == self.row_size - 1) or (position[(y + 1) * self.column_size + x] == '#')
-                    left = (x == 0) or (position[y * self.column_size + (x - 1)] == '#')
-                    right = (x == self.column_size - 1) or (position[y * self.column_size + (x + 1)] == '#')
+                    
+                    # 1. Wall-Corner Check
+                    up = (y == 0) or (position[idx - col] == '#')
+                    down = (y == row - 1) or (position[idx + col] == '#')
+                    left = (x == 0) or (position[idx - 1] == '#')
+                    right = (x == col - 1) or (position[idx + 1] == '#')
 
                     if (up or down) and (left or right):
                         return Value.Loss
+                    
+                    # 2. 2x2 Box-Cluster Check (Anchored on '$')
+                    # Check the 4 possible 2x2 squares this '$' could be part of.
+                    
+                    # Square 1: '$' is Top-Left
+                    if y < row - 1 and x < col - 1:
+                        if position[idx + 1] in immobile and \
+                           position[idx + col] in immobile and \
+                           position[idx + col + 1] in immobile:
+                            return Value.Loss
+                            
+                    # Square 2: '$' is Top-Right
+                    if y < row - 1 and x > 0:
+                        if position[idx - 1] in immobile and \
+                           position[idx + col] in immobile and \
+                           position[idx + col - 1] in immobile:
+                            return Value.Loss
+                            
+                    # Square 3: '$' is Bottom-Left
+                    if y > 0 and x < col - 1:
+                        if position[idx + 1] in immobile and \
+                           position[idx - col] in immobile and \
+                           position[idx - col + 1] in immobile:
+                            return Value.Loss
+                            
+                    # Square 4: '$' is Bottom-Right
+                    if y > 0 and x > 0:
+                        if position[idx - 1] in immobile and \
+                           position[idx - col] in immobile and \
+                           position[idx - col - 1] in immobile:
+                            return Value.Loss
 
         return None
 

@@ -5,7 +5,6 @@ import time
 
 REMOTENESS_TERMINAL = 0
 REMOTENESS_DRAW = 255
-REMOTENESS_LOSE_TERMINAL = -200
 
 class Solver:
     def __init__(self, game: Game):
@@ -141,7 +140,7 @@ class Solver:
                     self.solution[pos_hash] = (REMOTENESS_DRAW, Value.Draw)
             else:
                 if pos_hash not in self.solution or self.unsolved_children[pos_hash] > 0:
-                    self.solution[pos_hash] = (REMOTENESS_LOSE_TERMINAL, Value.Loss)
+                    self.solution[pos_hash] = (REMOTENESS_DRAW, Value.Loss)
             
     
     def parent_value(self, val: Value) -> Value:
