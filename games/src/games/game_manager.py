@@ -2,7 +2,7 @@ from .clobber import Clobber
 from .horses import Horses
 from .pancakes import Pancakes
 from .test import Test
-from .StormySeasV3 import StormySeas
+from .stormyseassmall import StormySeas
 from models import *
 
 game_list = {
