@@ -3,9 +3,18 @@ from waitress import serve
 from games import get_game
 from models import *
 from database import SqliteDB
+import time
+import psutil
+from datetime import datetime, timezone
 
 app = Flask("GamesmanPyServer")
 host, port = "127.0.0.1", 9004
+
+start_time = time.time()
+
+def format_time(seconds: float) -> str:
+    seconds = int(seconds)
+    return f"{seconds // 86400}d {(seconds % 86400) // 3600}h {(seconds % 3600) // 60}m {seconds % 60}s"
 
 ERR_POS = -1
 
@@ -115,6 +124,19 @@ def get_pos(game_id: str, variant_id: str):
     else:
         response["remoteness"] = rem
     return response
+
+@app.route('/health')
+def get_health():
+    current_process = psutil.Process()
+    with current_process.oneshot():
+        return {
+            'status': 'ok',
+            'http_code': 200,
+            'uptime': format_time(time.time() - start_time),
+            'cpu_usage': f"{current_process.cpu_percent():.2f}%",
+            'memory_usage': f"{current_process.memory_percent():.2f}%",
+            'timestamp': datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace('+00:00', 'Z')
+        }, 200
 
 @app.errorhandler(404)
 def handle_404(e):
