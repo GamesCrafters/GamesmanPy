@@ -1,7 +1,7 @@
 from .clobber import Clobber
 from .horses import Horses
 from .pancakes import Pancakes
-from .snakestale import Snakestale
+from .snakestale import ASnakestale
 from .chipschallenge import ChipsChallenge
 
 from .test import Test
@@ -12,7 +12,7 @@ game_list = {
     "clobber": Clobber,
     "horses": Horses,
     "pancakes": Pancakes,
-    "snakestale": Snakestale,
+    "snakestale": ASnakestale,
     "test": Test,
 }
 
