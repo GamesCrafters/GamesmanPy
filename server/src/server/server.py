@@ -8,11 +8,10 @@ import psutil
 from datetime import datetime, timezone
 
 app = Flask("GamesmanPyServer")
-host, port = "127.0.0.1", 9004
+host, port = "127.0.0.1", 9004 
 
 start_time = time.time()
 _server_process = psutil.Process()
-_server_process.cpu_percent()
 
 def format_time(seconds: float) -> str:
     seconds = int(seconds)
@@ -129,16 +128,29 @@ def get_pos(game_id: str, variant_id: str):
 
 @app.route('/health')
 def get_health():
-    with _server_process.oneshot():
-        cpu = _server_process.cpu_percent()
-        memory = _server_process.memory_percent()
-    return {
-        'status': 'ok',
+    cpu = _server_process.cpu_percent()
+    memory = _server_process.memory_percent()
+
+    issues = []
+    if cpu > 90:
+        issues.append(f"high CPU usage: {cpu:.2f}%")
+    if memory > 90:
+        issues.append(f"high memory usage: {memory:.2f}%")
+
+    status = 'degraded' if issues else 'ok'
+
+    body = {
+        'status': status,
         'uptime': format_time(time.time() - start_time),
         'cpu_usage': f"{cpu:.2f}%",
         'memory_usage': f"{memory:.2f}%",
         'timestamp': datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
-    }, 200
+    }
+
+    if issues:
+        body['issues'] = issues
+
+    return body, 503 if issues else 200
 
 @app.errorhandler(404)
 def handle_404(e):
