@@ -17,6 +17,14 @@ def format_time(seconds: float) -> str:
     seconds = int(seconds)
     return f"{seconds // 86400}d {(seconds % 86400) // 3600}h {(seconds % 3600) // 60}m {seconds % 60}s"
 
+start_time = time.time()
+_server_process = psutil.Process()
+_server_process.cpu_percent()
+
+def format_time(seconds: float) -> str:
+    seconds = int(seconds)
+    return f"{seconds // 86400}d {(seconds % 86400) // 3600}h {(seconds % 3600) // 60}m {seconds % 60}s"
+
 ERR_POS = -1
 
 def value_to_string(value: Value):
