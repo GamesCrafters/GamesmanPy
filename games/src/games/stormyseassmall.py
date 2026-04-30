@@ -22,9 +22,14 @@ class StormySeas(Game):
         self.num_rows = 0
         self.win_condition = ""  # Example win condition
 
-    def start(self) -> int:
         if self._variant_id == "a":
             self.default_rows = ["1011100","1010100","1101100","1011100","1110100"]
+            self.row_length = len(self.default_rows[0])
+            self.num_rows = len(self.default_rows)
+            self.win_condition = "43"
+
+    def start(self) -> int:
+        if self._variant_id == "a":
             self.board_rows = ["0101110","0101010","0011011","0101110","0111010"]
 
             # use ternary digits to represent shifts?
@@ -230,9 +235,7 @@ class StormySeas(Game):
         """
         # If move is already a position (from generate_moves), return it directly
         # Otherwise, this could be an index into the moves list
-        possible_moves = self.generate_moves(position)
-        if isinstance(move, int) and 0 <= move < len(possible_moves):
-            return possible_moves[move]
+        
         return move
 
     def primitive(self, position: int) -> Optional[Value]:
@@ -257,43 +260,71 @@ class StormySeas(Game):
         waveString = string_rep[:self.row_length * self.num_rows]
         boatString = string_rep[self.row_length * self.num_rows:]
 
-        # Build base grid from wave data
-        string_view = list(''.join(['~' if x == '1' else '.' for x in waveString]))
+        # pretend that the center of each tile is a wave or not
+        if mode == StringMode.AUTOGUI:
+            #translate the waves
+            
+            waves = ['W' if char == '1' else '-' for char in waveString]
+            #translate the boats; need to be coordinates in fashion of coords
+            red_row = int(boatString[0]);
+            red_col = int(boatString[1]);
+            blue_row = int(boatString[2]);
+            blue_col = int(boatString[3]);
+            for i in range(0, 7):
+                for j in range(0, 5):
+                    if j == red_row and i == red_col:
+                        waves[j + i * self.row_length] = 'R'
+                    elif j == blue_row and i == blue_col:
+                        waves[j + i * self.row_length] = 'B'
 
-        i = 0
-        color = 0
-        while i + 2 <= len(boatString):
-            boatSlice = boatString[i:i+2]
-            row = int(boatSlice[0])  # bottom cell row
-            col = int(boatSlice[1])  # column
+            StringtoReturn = "1_" + "".join(waves)
+            print(StringtoReturn)
+            return StringtoReturn
+        
+        else:
 
-            bottom_idx = self.CoordinateToPosition(col, row)
-            top_idx = self.CoordinateToPosition(col, row - 1)
 
-            if 0 <= bottom_idx < self.row_length * self.num_rows and 0 <= top_idx < self.row_length * self.num_rows:
-                string_view[bottom_idx] = self.colors[color].upper()  # bottom = uppercase
-                string_view[top_idx] = self.colors[color].lower()     # top = lowercase
+            # Build base grid from wave data
+            string_view = list(''.join(['w' if x == '1' else 'o' for x in waveString]))
 
-            color += 1
-            i += 2
+            i = 0
+            color = 0
+            while i + 2 <= len(boatString):
+                boatSlice = boatString[i:i+2]
+                row = int(boatSlice[0])  # bottom cell row
+                col = int(boatSlice[1])  # column
 
-        string_view = ''.join(string_view)
-        return "\n".join([string_view[self.row_length*x: self.row_length*x + self.row_length] for x in range(self.num_rows)])
+                bottom_idx = self.CoordinateToPosition(col, row)
+                top_idx = self.CoordinateToPosition(col, row - 1)
+
+                if 0 <= bottom_idx < self.row_length * self.num_rows and 0 <= top_idx < self.row_length * self.num_rows:
+                    string_view[bottom_idx] = self.colors[color].upper()  # bottom = uppercase
+                    string_view[top_idx] = self.colors[color].lower()     # top = lowercase
+
+                color += 1
+                i += 2
+
+            string_view = ''.join(string_view)
+            return string_view
 
     def from_string(self, strposition: str) -> int:
         """
         Returns the position from a string representation of the position.
         Input string is StringMode.Readable.
         """
-        rows = strposition.split("\n")
+        expected_length = self.row_length * self.num_rows
+        if len(strposition) < expected_length:
+            raise ValueError(f"Invalid readable position length: expected at least {expected_length}, got {len(strposition)}")
+
+        rows = [strposition[i:i+self.row_length] for i in range(0, expected_length, self.row_length)]
         binary_str = ""
         boat_positions = {}  # color -> (row, col) of bottom cell
 
         for row_idx, row in enumerate(rows):
             for col_idx, char in enumerate(row):
-                if char == '~':
+                if char == 'w':
                     binary_str += '1'
-                elif char == '.':
+                elif char == 'o':
                     binary_str += '0'
                 elif char.upper() in self.colors:
                     binary_str += '0'  # boat cell is not a wave
@@ -337,6 +368,7 @@ class StormySeas(Game):
             if curr_col != move_col or curr_row != move_row:
                 if curr_row != move_row:
                     direction = "down" if move_row > curr_row else "up"
+
                     return f"boat{color}-{direction}"
                 else:
                     direction = "left" if move_col < curr_col else "right"
