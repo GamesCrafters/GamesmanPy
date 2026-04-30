@@ -52,10 +52,10 @@ class TUI:
             case Value.Draw: return "draw"
 
     def print_position(self, game: Game, position: int):
-        print(game.to_string(position, StringMode.Readable))
+        print(game.to_string(position, StringMode.TUI))
     
     def get_move_string(self, game: Game, move: int):
-        return game.move_to_string(move, StringMode.Readable)
+        return game.move_to_string(move, StringMode.TUI)
     
     def get_valid_move(self, moves: list[str]) -> str:
         user_input = input("Select a move: ")

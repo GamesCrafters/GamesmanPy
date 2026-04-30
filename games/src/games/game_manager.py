@@ -1,11 +1,13 @@
 from .clobber import Clobber
 from .horses import Horses
 from .pancakes import Pancakes
+from .chipschallenge import ChipsChallenge
 from .test import Test
 from .stormyseassmall import StormySeas
 from models import *
 
 game_list = {
+    "chipschallenge": ChipsChallenge,
     "clobber": Clobber,
     "horses": Horses,
     "pancakes": Pancakes,

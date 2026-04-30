@@ -1,4 +1,4 @@
-from enum import IntEnum
+from enum import IntEnum, Enum
 from typing import Generic, TypeVar
 from dataclasses import dataclass
 
@@ -10,6 +10,14 @@ class Value(IntEnum):
     Draw = 1
     Tie = 2
     Win = 3
+
+class MoveValue(str, Enum):
+    WIN = 'win'
+    TIE = 'tie'
+    DRAW = 'draw'
+    LOSE = 'lose'
+    UNDECIDED = 'undecided'
+    UNSOLVED = 'unsolved'
 
 class StringMode(IntEnum):
     Readable = 0
