@@ -36,7 +36,15 @@ class ASnakestale(Game):
                         "water": [5, 9],
                         "land_snakes": [0, 4, 8, 12, 13, 14, 10, 6, 2],
                         "water_snakes": []
-                        }}
+                        },
+                "lvl5":{"board": "4x5",
+                        "obstacle": [6, 7, 12, 13],
+                        "pos_i": [3, 4, 9, 8],
+                        "hole_pos": 15,
+                        "length": 4,
+                        "water": [13, 18],
+                        "land_snakes": [16, 15, 10, 11],
+                        "water_snakes": []}}
 
 
 
@@ -286,7 +294,6 @@ class ASnakestale(Game):
             return self.start()
        
         flat = strposition.replace('\n', '')
-        print(f"DEBUG from_string input: '{flat}'")
        
         player_heads = {'w', 'v', 'i', 'r'}
         land_heads   = {'A', 'B', 'C', 'D'}
@@ -304,7 +311,6 @@ class ASnakestale(Game):
                 head_positions[1] = i
             elif ch in water_heads:
                 head_positions[2] = i
-        print(f"DEBUG head_positions: {head_positions}, chars: {[(k, flat[v]) for k,v in head_positions.items()]}")
 
 
         player_body_chars = {'q', 'p', 'b', 'c', 'd', 'e'}
@@ -373,7 +379,6 @@ class ASnakestale(Game):
                 cells_by_snake[idx] = follow_snake(
                     head_positions[idx], idx, body_tail_chars[idx], tail_maps[idx]
                 )
-                print(f"DEBUG snake {idx} cells: {cells_by_snake[idx]}, chars: {[flat[c] for c in cells_by_snake[idx]]}")
         return self.hash(cells_by_snake)
 
 
@@ -382,7 +387,6 @@ class ASnakestale(Game):
         snake_idx, target = divmod(move, total_cells)
         if mode == StringMode.AUTOGUI:
             head = self.all_movable_snakes[snake_idx].cells[0]
-            print(f"DEBUG move_to_string: snake={snake_idx} head={head} target={target} cells={self.all_movable_snakes[snake_idx].cells}")
             return f'M_{head}_{target}_x'
         r, c = divmod(target, self.cols)
         snake_names = ["Player", "LandSnake", "WaterSnake"]
