@@ -1,12 +1,19 @@
 from models import Game, Value, StringMode
 from typing import Optional
 
+# bigger boards
+
 # ── Constants ────────────────────────────────────────────────────────────────
 
 SIZE    = 5
 NCELLS  = SIZE * SIZE  # 25
 BASE    = 6            # colors 1-5 plus 0 (empty)
 NO_HEAD = NCELLS       # sentinel: 25 = no path in progress
+
+# Combined "select dot + first step" moves are encoded as:
+#   _CMB_OFF + dot * NCELLS + neighbor
+# The offset ensures these are always > 24 (max plain cell index), even when dot == 0.
+_CMB_OFF = NCELLS * NCELLS  # 625
 
 COLOR_NAMES = {0: ".", 1: "R", 2: "G", 3: "B", 4: "Y", 5: "M"}
 
@@ -15,12 +22,12 @@ COLOR_NAMES = {0: ".", 1: "R", 2: "G", 3: "B", 4: "Y", 5: "M"}
 
 # Each puzzle is verified to have a valid board-filling solution.
 #
-# Variant a:       Variant b:       Variant c:
-#   R G . . B        R G . . B        R . . . .
-#   . . Y . .        . Y . . M        G Y M . .
-#   M R . . .        . . G . .        . . B . .
-#   . Y . . .        . . Y . .        . Y . M .
-#   . . M G B        . . R B M        . G . B R
+# Variant a:       Variant b:       Variant c:       Variant d:
+#   R G . . B        R G . . B        R . . . .        R . R G .
+#   . . Y . .        . Y . . M        G Y M . .        . . G . .
+#   M R . . .        . . G . .        . . B . .        . . B . .
+#   . Y . . .        . . Y . .        . Y . M .        . B Y . Y
+#   . . M G B        . . R B M        . G . B R        M . . . M
 #
 PUZZLES = {
     "a": {
@@ -43,6 +50,23 @@ PUZZLES = {
         12: 3, 23: 3,       # Blue
          6: 4, 16: 4,       # Yellow
          7: 5, 18: 5,       # Maroon
+    },
+    "d": {
+         0: 1,  2: 1,       # Red
+         3: 2,  7: 2,       # Green
+        12: 3, 16: 3,       # Blue
+        17: 4, 19: 4,       # Yellow
+        20: 5, 24: 5,       # Maroon
+    },
+    "e": {
+         0: 1, 24: 1,       # Red
+         1: 2, 14: 2,       # Green
+         2: 3,  9: 3,       # Blue
+    },
+    "f": {
+         5: 1,  9: 1,       # Red
+         6: 2, 16: 2,       # Green
+        12: 3, 14: 3,       # Blue
     },
 }
 
@@ -91,7 +115,7 @@ def _all_connected(board: list[int], dots: dict) -> bool:
 
 class FlowFree(Game):
     id        = "flowfree"
-    variants  = ["a", "b", "c"]
+    variants  = ["a", "b", "c", "d", "e", "f"]
     n_players = 1
     cyclic    = False
 
@@ -165,7 +189,10 @@ class FlowFree(Game):
                 color = self._dots[cell]
                 ep1, ep2 = self._color_endpoints[color]
                 if not _color_connected(board, ep1, ep2, color):
-                    moves.append(cell)
+                    partner = ep2 if cell == ep1 else ep1
+                    for nb in _NEIGHBORS[cell]:
+                        if board[nb] == 0 or nb == partner:
+                            moves.append(_CMB_OFF + cell * NCELLS + nb)
         else:
             ep1, ep2 = self._color_endpoints[active_color]
             partner = ep2 if starting_dot == ep1 else ep1
@@ -183,8 +210,16 @@ class FlowFree(Game):
         board, active_color, active_head, starting_dot = self.unhash(position)
 
         if active_color == 0:
-            new_color = self._dots[move]
-            return self.hash(board, new_color, move, move)
+            raw      = move - _CMB_OFF
+            dot      = raw // NCELLS
+            neighbor = raw % NCELLS
+            new_color = self._dots[dot]
+            ep1, ep2  = self._color_endpoints[new_color]
+            partner   = ep2 if dot == ep1 else ep1
+            board[neighbor] = new_color
+            if neighbor == partner:
+                return self.hash(board, 0, NO_HEAD, NO_HEAD)
+            return self.hash(board, new_color, neighbor, dot)
 
         ep1, ep2 = self._color_endpoints[active_color]
         partner = ep2 if starting_dot == ep1 else ep1
@@ -209,43 +244,40 @@ class FlowFree(Game):
     # ── to_string ─────────────────────────────────────────────────────────────
 
     def to_string(self, position: int, mode: StringMode) -> str:
-        board, active_color, active_head, _ = self.unhash(position)
+        board, active_color, active_head, starting_dot = self.unhash(position)
 
         if mode == StringMode.AUTOGUI:
-            cells = "".join(str(c) for c in board)
-            return f"{cells}_{active_color}_{active_head}"
+            chars = [str(c) if c != 0 else '-' for c in board]
+            return "1_" + "".join(chars)
 
-        lines = ["  0 1 2 3 4"]
-        for r in range(SIZE):
-            row = f"{r} "
-            for c in range(SIZE):
-                idx = r * SIZE + c
-                ch  = COLOR_NAMES[board[idx]]
-                if active_color != 0 and idx == active_head:
-                    ch = ch.lower()
-                row += ch + " "
-            lines.append(row.rstrip())
-        head_label   = str(active_head) if active_color != 0 else "-"
-        active_label = COLOR_NAMES.get(active_color, "?")
-        lines.append(f"Drawing: {active_label}   Head: {head_label}")
-        return "\n".join(lines)
+        # Compact, URL-safe, parseable by from_string
+        cells = "".join(str(c) for c in board)
+        return f"{cells}_{active_color}_{active_head}_{starting_dot}"
 
     # ── from_string ───────────────────────────────────────────────────────────
 
     def from_string(self, strposition: str) -> int:
         parts = strposition.strip().split("_")
-        if len(parts) != 3:
-            raise ValueError(f"Expected '<cells>_<color>_<head>', got: {strposition!r}")
-        cells_str, ac_str, ah_str = parts
+        if len(parts) != 4:
+            raise ValueError(f"Expected '<cells>_<color>_<head>_<startdot>', got: {strposition!r}")
+        cells_str, ac_str, ah_str, sd_str = parts
         if len(cells_str) != NCELLS:
             raise ValueError(f"Expected {NCELLS} digits, got {len(cells_str)}")
-        # starting_dot not stored in string; infer it as NO_HEAD (rest states only)
-        return self.hash([int(ch) for ch in cells_str], int(ac_str), int(ah_str), NO_HEAD)
+        return self.hash([int(ch) for ch in cells_str], int(ac_str), int(ah_str), int(sd_str))
 
     # ── move_to_string ────────────────────────────────────────────────────────
 
-    def move_to_string(self, move: int, mode: StringMode) -> str:
+    def move_to_string(self, move: int, mode: StringMode, position: int = None) -> str:
         if mode == StringMode.AUTOGUI:
-            return str(move)
-        r, c = divmod(move, SIZE)
+            if move >= _CMB_OFF:
+                raw = move - _CMB_OFF
+                dot, neighbor = divmod(raw, NCELLS)
+                return f"M_{dot}_{neighbor}"
+            if position is not None:
+                _, active_color, active_head, _ = self.unhash(position)
+                if active_color != 0:
+                    return f"M_{active_head}_{move}"
+            return f"A_-_{move}_x"
+        cell = (move - _CMB_OFF) % NCELLS if move >= _CMB_OFF else move
+        r, c = divmod(cell, SIZE)
         return f"{r},{c}"
