@@ -233,9 +233,14 @@ class StormySeas(Game):
         """
         Returns the resulting position of applying move to position.
         """
-        # If move is already a position (from generate_moves), return it directly
-        # Otherwise, this could be an index into the moves list
+        # generate_moves returns a list of valid next positions
+        possible_moves = self.generate_moves(position)
         
+        # If move is an index into the possible_moves list, return that position
+        if isinstance(move, int) and 0 <= move < len(possible_moves):
+            return possible_moves[move]
+        
+        # Otherwise assume move is already a position hash
         return move
 
     def primitive(self, position: int) -> Optional[Value]:
@@ -265,21 +270,32 @@ class StormySeas(Game):
             #translate the waves
             
             waves = ['W' if char == '1' else '-' for char in waveString]
+            boat = []
             #translate the boats; need to be coordinates in fashion of coords
             red_row = int(boatString[0]);
             red_col = int(boatString[1]);
             blue_row = int(boatString[2]);
             blue_col = int(boatString[3]);
-            for i in range(0, 7):
-                for j in range(0, 5):
-                    if j == red_row and i == red_col:
-                        waves[i + j * self.row_length] = 'R'
-                    elif j == blue_row and i == blue_col:
-                        waves[i + j * self.row_length] = 'B'
 
-            StringtoReturn = "1_" + "".join(waves)
-            print(StringtoReturn)
-            return StringtoReturn
+            for j in range(0, 5):
+                for i in range(0, 7):
+                    if j == red_row and i == red_col:
+                        boat += ['R']
+                    elif j == blue_row and i == blue_col:
+                        boat += ['B']
+                    else:
+                        boat += ['-']
+
+            stringWave = ""
+            for string in waves:
+                stringWave += string
+            
+            stringBoat = ""
+            for string in boat:
+                stringBoat += string
+
+            return "1_" + stringWave + stringBoat
+
         
         else:
 
