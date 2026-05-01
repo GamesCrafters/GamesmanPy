@@ -42,7 +42,7 @@ class ASnakestale(Game):
                         "pos_i": [3, 4, 9, 8],
                         "hole_pos": 15,
                         "length": 4,
-                        "water": [13, 18],
+                        "water": [18],
                         "land_snakes": [16, 15, 10, 11],
                         "water_snakes": []}}
 
@@ -486,9 +486,6 @@ class WaterSnake(Snake):
         if not super().can_enter(cell, board):  
             return False
         return True
-
-
-
 
 class LandSnake(Snake):
     def can_enter(self, cell, board):
