@@ -10,7 +10,6 @@ class Sokoban(Game):
     cyclic = True
     max_spaces = 250 # max number of squares (take max length x width of all levels)
     comb_table = [[math.comb(n, k) for k in range(20)] for n in range(max_spaces)] 
-    immobile = {'#', '$', '*'}
 
     def __init__(self, variant_id: str):
         """
@@ -24,6 +23,16 @@ class Sokoban(Game):
         # Directions: Right, Down, Left, Up
         self.dxdy = [(1, 0), (0, 1), (-1, 0), (0, -1)]
         self.dirs = {(1, 0): "R", (0, 1): "D", (-1, 0): "L", (0, -1): "U"}
+
+        """
+        #: wall
+        $: box
+        .: goal
+        @: player
+        *: box on goal
+        +: player on goal
+         : empty
+        """
 
         match self._variant_id:
             # roughly 2,035,800 box arrangements
@@ -290,7 +299,7 @@ class Sokoban(Game):
         return moves
 
     def do_move(self, position: str, move: tuple) -> str:
-        box_idx, dx, dy = move
+        old_box_idx, dx, dy = move
         pos_list = list(position)
         
         old_p_idx = position.find('@')
@@ -300,17 +309,18 @@ class Sokoban(Game):
             old_p_idx = position.find('+')
             pos_list[old_p_idx] = '.'
             
-        n_idx = box_idx + dx + (dy * self.column_size)
+        n_idx = old_box_idx + dx + (dy * self.column_size) #new idx of the box
         
         if pos_list[n_idx] == '.':
             pos_list[n_idx] = '*'
         else:
             pos_list[n_idx] = '$'
-            
-        if position[box_idx] == '*': 
-            pos_list[box_idx] = '+'
+
+        #updates the old box idx, which is also the new player idx    
+        if position[old_box_idx] == '*': 
+            pos_list[old_box_idx] = '+'
         else:
-            pos_list[box_idx] = '@'
+            pos_list[old_box_idx] = '@'
             
         return "".join(pos_list)
     
@@ -318,33 +328,35 @@ class Sokoban(Game):
         if position.find('$') == -1:
             return Value.Win
 
-        immobile = {'#', '$', '*'}
+        blocker = {'#', '$', '*'} 
         col = self.column_size
 
         idx = position.find('$')
+
+        #check to see if any box is surrounded on all 4 sides by a blocker
         while idx != -1:
             
             if idx in self.dead_squares:
                 return Value.Loss
                 
-            if position[idx - 1] in immobile and \
-               position[idx - col] in immobile and \
-               position[idx - col - 1] in immobile:
+            if position[idx - 1] in blocker and \
+               position[idx - col] in blocker and \
+               position[idx - col - 1] in blocker:
                 return Value.Loss
                 
-            if position[idx + 1] in immobile and \
-               position[idx - col] in immobile and \
-               position[idx - col + 1] in immobile:
+            if position[idx + 1] in blocker and \
+               position[idx - col] in blocker and \
+               position[idx - col + 1] in blocker:
                 return Value.Loss
 
-            if position[idx - 1] in immobile and \
-               position[idx + col] in immobile and \
-               position[idx + col - 1] in immobile:
+            if position[idx - 1] in blocker and \
+               position[idx + col] in blocker and \
+               position[idx + col - 1] in blocker:
                 return Value.Loss
                 
-            if position[idx + 1] in immobile and \
-               position[idx + col] in immobile and \
-               position[idx + col + 1] in immobile:
+            if position[idx + 1] in blocker and \
+               position[idx + col] in blocker and \
+               position[idx + col + 1] in blocker:
                 return Value.Loss
 
             idx = position.find('$', idx + 1)
