@@ -1,10 +1,8 @@
 from models import Game, Value, StringMode
 from typing import Optional
 # marble_circuit
-# 口 0..3 = TL, TR, BR, BL
 TOP_LEFT, TOP_RIGHT, BOTTOM_RIGHT, BOTTOM_LEFT = 0, 1, 2, 3
 
-# 四种块路径 (in, out)，不可旋转
 TEAL_DIAMOND_PATHS = [(TOP_LEFT, BOTTOM_LEFT), (BOTTOM_LEFT, TOP_LEFT), (TOP_RIGHT, BOTTOM_RIGHT), (BOTTOM_RIGHT, TOP_RIGHT)]
 ORANGE_T_PATHS = [(TOP_LEFT, BOTTOM_RIGHT), (BOTTOM_RIGHT, TOP_LEFT), (TOP_RIGHT, BOTTOM_RIGHT), (BOTTOM_RIGHT, TOP_RIGHT)]
 YELLOW_T_PATHS = [(TOP_LEFT, BOTTOM_LEFT), (BOTTOM_LEFT, TOP_LEFT), (TOP_RIGHT, BOTTOM_LEFT), (BOTTOM_LEFT, TOP_RIGHT)]
@@ -27,8 +25,6 @@ def rotate_paths(paths: list[tuple[int, int]], rotation: int) -> list[tuple[int,
     ) for a, b in paths]
 
 
-# 金字塔 10 格：口 0..3 = TL/TR/BR/BL。topology[slot][port] = (邻居slot, 邻居口) 或 ('exit', 目标0..4)。
-# 布局 0 / 1,2 / 3,4,5 / 6,7,8,9；底排无横向，BL/BR 为出口。
 PYRAMID_10_TOPOLOGY_CORNERS: list[list[tuple[int, int] | tuple[str, int] | None]] = [
     [None, None, (2, TOP_LEFT), (1, TOP_RIGHT)],
     [(0, BOTTOM_LEFT), (0, BOTTOM_RIGHT), (4, TOP_LEFT), (3, TOP_RIGHT)],
@@ -43,7 +39,7 @@ PYRAMID_10_TOPOLOGY_CORNERS: list[list[tuple[int, int] | tuple[str, int] | None]
 ]
 ENTRY_START_PYRAMID = [(6, TOP_LEFT), (3, TOP_LEFT), (1, TOP_LEFT), (0, TOP_LEFT), (0, TOP_RIGHT), (2, TOP_RIGHT), (5, TOP_RIGHT), (9, TOP_RIGHT)]
 
-# 块类型 1=T 2=O 3=Y 4=M。fixed_slots 不可 remove。
+# 1=T 2=O 3=Y 4=M。fixed_slots not removable
 PYRAMID_CHALLENGES: dict[str, dict] = {
     "ch1": {
         # Challenge 1：「H x - - x H \ y \ H」→ Solution「H x y x x H \ y \ H」
@@ -574,7 +570,6 @@ PYRAMID_10_TOPOLOGY: list[list[tuple[int, int] | tuple[str, int] | None]] = [
 
 
 class MarbleCircuit(Game):
-    """Marble Circuit：10 槽金字塔、4 种块不可旋转、按出口计数判胜"""
     id = "marble_circuit"
     variants = ["ch1", "ch2", "ch3", "ch4", "ch5", "ch6", "ch7", "ch8", "ch9", "ch10", "ch11", "ch12", "ch13", "ch14", "ch15", "ch16", "ch17", "ch18", "ch19", "ch20", "ch21", "ch22", "ch23", "ch24", "ch25", "ch26", "ch27", "ch28", "ch29", "ch30", "ch31", "ch32", "ch33", "ch34", "ch35", "ch36", "ch37", "ch38", "ch39", "ch40", "ch41", "ch42", "ch43", "ch44", "ch45", "ch46", "ch47", "ch48", "ch49", "ch50", "ch51", "ch52", "ch53", "ch54", "ch55", "ch56", "ch57", "ch58", "ch59", "ch60", "ch61", "ch62", "ch63", "ch64"]
     n_players = 1
@@ -682,7 +677,6 @@ class MarbleCircuit(Game):
         return []
 
     def _get_topology_ch23(self, board: list[int]) -> list[list[tuple[int, int] | tuple[str, int] | None]]:
-        """返回金字塔几何拓扑，当前实现与 board 无关。"""
         return PYRAMID_10_TOPOLOGY_CORNERS
 
     def _simulate_marble(self, board: list[int], start_entry: int) -> Optional[int]:
@@ -716,7 +710,6 @@ class MarbleCircuit(Game):
             slot, side = conn
 
     def _simulate_marble_with_path(self, board: list[int], start_entry: int) -> tuple[Optional[int], list[tuple[int, int]]]:
-        """返回 (出口id或None, 路径 [(slot, port), ...])。"""
         if not self._is_pyramid:
             ex = self._simulate_marble(board, start_entry)
             return (ex, [(0, 0)] if ex is not None else [])
@@ -756,7 +749,6 @@ class MarbleCircuit(Game):
         ]
 
     def _get_exit_counts_ch23(self, board: list[int]) -> list[int]:
-        """8 球模拟，返回 5 个出口计数。"""
         counts = [0] * 5
         for entry_id in range(8):
             ex = self._simulate_marble(board, entry_id)
@@ -882,7 +874,6 @@ class MarbleCircuit(Game):
         return Value.Win if self._all_goals_met(board) else Value.Loss
 
     def get_exit_counts_display(self, position: int) -> Optional[str]:
-        """终局时返回出口计数与目标对比；非金字塔或未终局返回 None。"""
         if not self._is_pyramid:
             return None
         board, rem, confirmed = self._decode_ch23(position)
@@ -937,8 +928,6 @@ class MarbleCircuit(Game):
             if not confirmed:
                 rows.insert(0, " o  o  o  o  o  o  o  o")
             s = "\n".join(legend + [""] + rows)
-            # Single-line key: UWAPI / GamesmanUni use Readable position in URLs; multiline breaks loads.
-            # 14 dots: 4 rem | 5 goals (targets) | 5 exit results — order matches UWAPI centers 14–27.
             _dots = "." * 14
             board_str = "".join(str(b) for b in board) + "TOYM" + _dots
             goals = list(self._ch_config["exit_counts"])
@@ -967,7 +956,6 @@ class MarbleCircuit(Game):
         lines = [f"[{board[0]}][{board[1]}]  rem: S={rem_s} L={rem_L}", f"[{board[2]}][{board[3]}]"]
         s = "\n".join(lines)
         if mode == StringMode.AUTOGUI:
-            # Use standard autogui prefix (1 = player to move) so frontend renders ImageAutoGUI.
             return "1_" + "".join(str(b) for b in board) + f"_{rem_s}_{rem_L}"
         return s
 
@@ -1015,7 +1003,6 @@ class MarbleCircuit(Game):
             k = move % 4
             kind = ("H", "\\", "y", "x")[k]
             if mode == StringMode.AUTOGUI:
-                # t/o/y/m = small move buttons; centers 50+4*slot+k (UWAPI). Board uses 1–4 for cells.
                 token_char = ("t", "o", "y", "m")[k]
                 center_idx = 50 + slot * 4 + k
                 return f"A_{token_char}_{center_idx}"
