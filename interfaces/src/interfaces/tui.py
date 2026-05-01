@@ -12,7 +12,15 @@ class TUI:
 
 
     def play(self, game: Game, variant: str):
-        db = SqliteDB(game.id, variant)
+        import sqlite3
+        use_db = True
+        db = None
+        try:
+            db = SqliteDB(game.id, variant)
+            _ = db.get(game.start())
+        except sqlite3.OperationalError:
+            use_db = False
+            print("(No solver database for this game — playing without win/loss hints.)")
         curr_pos = game.start()
         while game.primitive(curr_pos) is None:
             print("Current position:")
@@ -31,7 +39,12 @@ class TUI:
             user_move = self.get_valid_move(moves_map.keys())
             curr_pos = game.do_move(curr_pos, moves_map[user_move])
         self.print_position(game, curr_pos)
-        print("GAME OVER")
+        result = game.primitive(curr_pos)
+        print("GAME OVER" + (" — You win!" if result == Value.Win else " — No solution."))
+        if hasattr(game, "get_exit_counts_display"):
+            msg = game.get_exit_counts_display(curr_pos)
+            if msg:
+                print(msg)
 
     def get_move_value(self, child_val):
         if self.game.n_players == 1:
@@ -58,14 +71,18 @@ class TUI:
         return game.move_to_string(move, StringMode.TUI)
     
     def get_valid_move(self, moves: list[str]) -> str:
+        moves = list(moves)
+        lower_map = {move.lower(): move for move in moves}
         user_input = input("Select a move: ")
         if user_input == 'q':
             exit()
-        while user_input not in moves:
+        while user_input not in moves and user_input.lower() not in lower_map:
             user_input = input("Invalid move. Please select a valid move: ")
             if user_input == 'q':
                 exit()
-        return user_input
+        if user_input in moves:
+            return user_input
+        return lower_map[user_input.lower()]
     
     def select_game(self) -> Game:
         print(f'Games: {', '.join(game_list.keys())}')

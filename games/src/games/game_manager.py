@@ -1,5 +1,7 @@
 from .clobber import Clobber
 from .horses import Horses
+from .lightsout import LightsOut
+from .marble_circuit import MarbleCircuit
 from .pancakes import Pancakes
 from .chipschallenge import ChipsChallenge
 from .test import Test
@@ -9,6 +11,8 @@ game_list = {
     "chipschallenge": ChipsChallenge,
     "clobber": Clobber,
     "horses": Horses,
+    "lightsout": LightsOut,
+    "marble_circuit": MarbleCircuit,
     "pancakes": Pancakes,
     "test": Test,
 }
@@ -24,4 +28,3 @@ def get_game(game_id: str, variant_id: str=None) -> Result[Game, str]:
     if variant_id is not None and variant_id not in game.variants:
         return Err("Invalid variant ID")
     return Ok(game)
-    
