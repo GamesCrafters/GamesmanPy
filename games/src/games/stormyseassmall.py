@@ -273,9 +273,9 @@ class StormySeas(Game):
             for i in range(0, 7):
                 for j in range(0, 5):
                     if j == red_row and i == red_col:
-                        waves[j + i * self.row_length] = 'R'
+                        waves[i + j * self.row_length] = 'R'
                     elif j == blue_row and i == blue_col:
-                        waves[j + i * self.row_length] = 'B'
+                        waves[i + j * self.row_length] = 'B'
 
             StringtoReturn = "1_" + "".join(waves)
             print(StringtoReturn)

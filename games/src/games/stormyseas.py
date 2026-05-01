@@ -1,3 +1,7 @@
+
+# THIS FUNCTION IS DEFUNCT, PLEASE LOOK AT STORMYSEASSMALL INSTEAD
+
+
 from models import Game, Value, StringMode
 from typing import Optional
 
@@ -258,7 +262,7 @@ class StormySeas(Game):
         # pretend that the center of each tile is a wave or not
         if mode == StringMode.AUTOGUI:
             #translate the waves
-            waves = ['W' if char == '1' else '-' for char in waveString]
+            waves = ['W' if char == '0' else '-' for char in waveString]
             #translate the boats; need to be coordinates in fashion of coords
             boat = []
             red_row = int(boatString[0]);
@@ -283,31 +287,32 @@ class StormySeas(Game):
                 stringBoat += string
 
             return "1_" + stringWave + stringBoat
+    
         elif mode == StringMode.READABLE:
 
             
         # Build base grid from wave data
-        string_view = list(''.join(['~' if x == '1' else '.' for x in waveString]))
+            string_view = list(''.join(['~' if x == '1' else '.' for x in waveString]))
 
-        i = 0
-        color = 0
-        while i + 2 <= len(boatString):
-            boatSlice = boatString[i:i+2]
-            row = int(boatSlice[0])  # bottom cell row
-            col = int(boatSlice[1])  # column
+            i = 0
+            color = 0
+            while i + 2 <= len(boatString):
+                boatSlice = boatString[i:i+2]
+                row = int(boatSlice[0])  # bottom cell row
+                col = int(boatSlice[1])  # column
 
-            bottom_idx = self.CoordinateToPosition(col, row)
-            top_idx = self.CoordinateToPosition(col, row - 1)
+                bottom_idx = self.CoordinateToPosition(col, row)
+                top_idx = self.CoordinateToPosition(col, row - 1)
 
-            if 0 <= bottom_idx < self.row_length * self.num_rows and 0 <= top_idx < self.row_length * self.num_rows:
-                string_view[bottom_idx] = self.colors[color].upper()  # bottom = uppercase
-                string_view[top_idx] = self.colors[color].lower()     # top = lowercase
+                if 0 <= bottom_idx < self.row_length * self.num_rows and 0 <= top_idx < self.row_length * self.num_rows:
+                    string_view[bottom_idx] = self.colors[color].upper()  # bottom = uppercase
+                    string_view[top_idx] = self.colors[color].lower()     # top = lowercase
 
-            color += 1
-            i += 2
+                color += 1
+                i += 2
 
-        string_view = ''.join(string_view)
-        return "\n".join([string_view[self.row_length*x: self.row_length*x + self.row_length] for x in range(self.num_rows)])
+            string_view = ''.join(string_view)
+            return "\n".join([string_view[self.row_length*x: self.row_length*x + self.row_length] for x in range(self.num_rows)])
 
     def from_string(self, strposition: str) -> int:
         """
