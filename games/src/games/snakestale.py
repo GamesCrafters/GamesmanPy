@@ -36,7 +36,19 @@ class ASnakestale(Game):
                         "water": [5, 9],
                         "land_snakes": [0, 4, 8, 12, 13, 14, 10, 6, 2],
                         "water_snakes": []
+<<<<<<< HEAD
                         }}
+=======
+                        },
+                "lvl5":{"board": "4x5",
+                        "obstacle": [6, 7, 12, 13],
+                        "pos_i": [3, 4, 9, 8],
+                        "hole_pos": 15,
+                        "length": 4,
+                        "water": [18],
+                        "land_snakes": [16, 15, 10, 11],
+                        "water_snakes": []}}
+>>>>>>> fc966d6 (lvl5)
 
 
 
@@ -482,9 +494,6 @@ class WaterSnake(Snake):
         if not super().can_enter(cell, board):  
             return False
         return True
-
-
-
 
 class LandSnake(Snake):
     def can_enter(self, cell, board):
