@@ -363,6 +363,49 @@ class StormySeas(Game):
     
     def move_to_string(self, move: int, mode: StringMode) -> str:
         if mode != StringMode.Readable:
+
+            move_rep = self.translate(self.unhash(move))
+            move_rows = [move_rep[i:i+self.row_length] for i in range(0, self.row_length * self.num_rows, self.row_length)]
+            move_boat_str = move_rep[self.row_length * self.num_rows:]
+            move_boats = [move_boat_str[i:i+2] for i in range(0, len(move_boat_str), 2)]
+
+            curr_rows = self.board_rows
+            curr_boats = self.boat_pos
+
+            # Check if any boat moved
+            for boat_i, (curr_bp, move_bp) in enumerate(zip(curr_boats, move_boats)):
+                curr_row, curr_col = int(curr_bp[0]), int(curr_bp[1])
+                move_row, move_col = int(move_bp[0]), int(move_bp[1])
+                color = self.colors[boat_i].lower()
+
+                if curr_col != move_col or curr_row != move_row:
+                    if curr_row != move_row:
+                        direction = "down" if move_row > curr_row else "up"
+                        start = curr_row * self.row_length + curr_col + 42
+                        end = move_row * self.row_length + move_col + 42
+
+                        return f"M_{start}_{end}_x"
+
+                    else:
+                        direction = "left" if move_col < curr_col else "right"
+                        start = curr_row * self.row_length + curr_col + 42
+                        end = move_row * self.row_length + move_col + 42
+
+                        return f"M_{start}_{end}_x"
+
+            # Otherwise a wave row moved
+            for row_i, (curr_row, move_row) in enumerate(zip(curr_rows, move_rows)):
+                if curr_row != move_row:
+                    if move_row == curr_row[1:] + "0":
+                        start = row_i * self.row_length + 43
+                        end = row_i * self.row_length + 42
+
+                        return f"M_{start}_{end}_x"
+                    else:
+                        start = row_i * self.row_length + 47
+                        end = row_i * self.row_length + 48
+                        return f"M_{start}_{end}_x"
+
             return str(move)
 
         # Get current board state from self.board_rows and self.boat_pos
@@ -422,7 +465,8 @@ class StormySeas(Game):
         return int(result, 3)
 
     def unhash(self, intPos: int) -> str:
-        total_length = self.num_rows + 5 * len(self.boat_pos)  # 5 shifts + 5 ternary digits per boat
+        boat_count = len(self.colors)
+        total_length = self.num_rows + 5 * boat_count  # 5 shifts + 5 ternary digits per boat
         strPos = self.toTernaryString(intPos).rjust(total_length, "0")
 
         wavePosString = strPos[:self.num_rows]
