@@ -72,6 +72,22 @@ def get_pos(game_id: str, variant_id: str):
         moves =  game.generate_moves(pos)
     
     move_objs = []
+    for move in moves:
+        new_pos = game.do_move(pos, move)
+        new_hashed_pos = game.hash_ext(new_pos)
+        child = db.get(new_hashed_pos)
+        if child is not None:
+            (child_rem, child_val) = child
+            item = {
+                "position": game.to_string(new_pos, StringMode.Readable),
+                "autoguiPosition": game.to_string(new_pos, StringMode.AUTOGUI),
+                "positionValue": value_to_string(child_val),
+                "move": game.move_to_string(move, StringMode.Readable),
+                "autoguiMove": game.move_to_string(move, StringMode.AUTOGUI, pos)
+            }
+            if child_val == Value.Win:
+                item["remoteness"] = child_rem
+            move_objs.append(item)
     if game.uses_half_moves:
         move_dict = {}
         for move in moves:

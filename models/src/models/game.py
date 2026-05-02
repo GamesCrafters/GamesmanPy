@@ -53,9 +53,10 @@ class Game(ABC):
         raise NotImplementedError("from_string() not implemented.")
 
     @abstractmethod
-    def move_to_string(self, move: int, mode: StringMode) -> str:
+    def move_to_string(self, move: int, mode: StringMode, position: int = None) -> str:
         """
         Returns a string representation of the move based on the given mode.
+        position is the current position (optional, used by some games for context).
         """
         raise NotImplementedError("move_to_string() not implemented.")
     
