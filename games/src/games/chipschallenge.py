@@ -61,7 +61,7 @@ class ChipsChallenge(Game):
         return "".join(reversed(result))
     
     def to_number_string(self, string):
-        string = string.replace("p", " ").replace(".", " ")
+        string = string.replace("p", " ").replace("-", " ")
         bits = []
         for idx in range(self.row_size*self.column_size):
             if self.starting_pos[idx] not in " W":
@@ -147,10 +147,10 @@ class ChipsChallenge(Game):
         """
         if mode == StringMode.Readable:
             board = [position[idx*self.row_size:idx*self.row_size + self.row_size] for idx in range(self.column_size)]
-            return "".join(board).replace(" ", ".")
+            return "".join(board).replace(" ", "-")
         elif mode == StringMode.TUI:
             board = [position[idx*self.row_size:idx*self.row_size + self.row_size] for idx in range(self.column_size)]
-            return "\n".join(board).replace(".", " ")
+            return "\n".join(board).replace("-", " ")
         else:
             position = position + (self.column_size*self.row_size - len(position))*" "
             return "1_" + position.replace(' ', '-') 
