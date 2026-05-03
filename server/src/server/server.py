@@ -8,7 +8,14 @@ import psutil
 from datetime import datetime, timezone
 
 app = Flask("GamesmanPyServer")
-host, port = "127.0.0.1", 9004
+host, port = "127.0.0.1", 9004 
+
+start_time = time.time()
+_server_process = psutil.Process()
+
+def format_time(seconds: float) -> str:
+    seconds = int(seconds)
+    return f"{seconds // 86400}d {(seconds % 86400) // 3600}h {(seconds % 3600) // 60}m {seconds % 60}s"
 
 start_time = time.time()
 _server_process = psutil.Process()
@@ -65,22 +72,6 @@ def get_pos(game_id: str, variant_id: str):
         moves =  game.generate_moves(pos)
     
     move_objs = []
-    for move in moves:
-        new_pos = game.do_move(pos, move)
-        new_hashed_pos = game.hash_ext(new_pos)
-        child = db.get(new_hashed_pos)
-        if child is not None:
-            (child_rem, child_val) = child
-            item = {
-                "position": game.to_string(new_pos, StringMode.Readable),
-                "autoguiPosition": game.to_string(new_pos, StringMode.AUTOGUI),
-                "positionValue": value_to_string(child_val),
-                "move": game.move_to_string(move, StringMode.Readable),
-                "autoguiMove": game.move_to_string(move, StringMode.AUTOGUI, pos)
-            }
-            if child_val == Value.Win:
-                item["remoteness"] = child_rem
-            move_objs.append(item)
     if game.uses_half_moves:
         move_dict = {}
         for move in moves:
@@ -145,16 +136,29 @@ def get_pos(game_id: str, variant_id: str):
 
 @app.route('/health')
 def get_health():
-    with _server_process.oneshot():
-        cpu = _server_process.cpu_percent()
-        memory = _server_process.memory_percent()
-    return {
-        'status': 'ok',
+    cpu = _server_process.cpu_percent()
+    memory = _server_process.memory_percent()
+
+    issues = []
+    if cpu > 90:
+        issues.append(f"high CPU usage: {cpu:.2f}%")
+    if memory > 90:
+        issues.append(f"high memory usage: {memory:.2f}%")
+
+    status = 'degraded' if issues else 'ok'
+
+    body = {
+        'status': status,
         'uptime': format_time(time.time() - start_time),
         'cpu_usage': f"{cpu:.2f}%",
         'memory_usage': f"{memory:.2f}%",
         'timestamp': datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
-    }, 200
+    }
+
+    if issues:
+        body['issues'] = issues
+
+    return body, 503 if issues else 200
 
 @app.errorhandler(404)
 def handle_404(e):

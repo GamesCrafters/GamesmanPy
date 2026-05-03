@@ -12,8 +12,12 @@ NO_HEAD = NCELLS       # sentinel: 25 = no path in progress
 
 # Combined "select dot + first step" moves are encoded as:
 #   _CMB_OFF + dot * NCELLS + neighbor
-# The offset ensures these are always > 24 (max plain cell index), even when dot == 0.
 _CMB_OFF = NCELLS * NCELLS  # 625
+
+# Continuation moves (extending active path) are encoded as:
+#   _CONT_OFF + active_head * NCELLS + neighbor
+# Encodes the from-cell so move_to_string needs no position context.
+_CONT_OFF = 2 * NCELLS * NCELLS  # 1250
 
 COLOR_NAMES = {0: ".", 1: "R", 2: "G", 3: "B", 4: "Y", 5: "M"}
 
@@ -197,10 +201,8 @@ class FlowFree(Game):
             ep1, ep2 = self._color_endpoints[active_color]
             partner = ep2 if starting_dot == ep1 else ep1
             for nb in _NEIGHBORS[active_head]:
-                if board[nb] == 0:
-                    moves.append(nb)
-                elif nb == partner:
-                    moves.append(nb)
+                if board[nb] == 0 or nb == partner:
+                    moves.append(_CONT_OFF + active_head * NCELLS + nb)
 
         return moves
 
@@ -223,13 +225,14 @@ class FlowFree(Game):
 
         ep1, ep2 = self._color_endpoints[active_color]
         partner = ep2 if starting_dot == ep1 else ep1
+        neighbor = move % NCELLS  # decode from _CONT_OFF + head * NCELLS + neighbor
 
-        if move == partner:
-            board[move] = active_color
+        if neighbor == partner:
+            board[neighbor] = active_color
             return self.hash(board, 0, NO_HEAD, NO_HEAD)
 
-        board[move] = active_color
-        return self.hash(board, active_color, move, starting_dot)
+        board[neighbor] = active_color
+        return self.hash(board, active_color, neighbor, starting_dot)
 
     # ── primitive ─────────────────────────────────────────────────────────────
 
@@ -267,17 +270,22 @@ class FlowFree(Game):
 
     # ── move_to_string ────────────────────────────────────────────────────────
 
-    def move_to_string(self, move: int, mode: StringMode, position: int = None) -> str:
+    def move_to_string(self, move: int, mode: StringMode) -> str:
         if mode == StringMode.AUTOGUI:
+            if move >= _CONT_OFF:
+                raw = move - _CONT_OFF
+                head, neighbor = divmod(raw, NCELLS)
+                return f"M_{head}_{neighbor}"
             if move >= _CMB_OFF:
                 raw = move - _CMB_OFF
                 dot, neighbor = divmod(raw, NCELLS)
                 return f"M_{dot}_{neighbor}"
-            if position is not None:
-                _, active_color, active_head, _ = self.unhash(position)
-                if active_color != 0:
-                    return f"M_{active_head}_{move}"
             return f"A_-_{move}_x"
-        cell = (move - _CMB_OFF) % NCELLS if move >= _CMB_OFF else move
-        r, c = divmod(cell, SIZE)
+        if move >= _CONT_OFF:
+            neighbor = move % NCELLS
+        elif move >= _CMB_OFF:
+            neighbor = (move - _CMB_OFF) % NCELLS
+        else:
+            neighbor = move
+        r, c = divmod(neighbor, SIZE)
         return f"{r},{c}"
