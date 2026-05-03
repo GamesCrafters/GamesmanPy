@@ -1,7 +1,8 @@
+from .chipschallenge import ChipsChallenge
 from .clobber import Clobber
 from .horses import Horses
+from .klotski import Klotski
 from .pancakes import Pancakes
-from .chipschallenge import ChipsChallenge
 from .test import Test
 from models import *
 
@@ -9,6 +10,7 @@ game_list = {
     "chipschallenge": ChipsChallenge,
     "clobber": Clobber,
     "horses": Horses,
+    "klotski": Klotski,
     "pancakes": Pancakes,
     "test": Test,
 }
