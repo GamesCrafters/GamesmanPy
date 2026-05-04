@@ -81,8 +81,6 @@ class Hashi(Game):
                                     break
             if not between:
                 moves.append(i)
-        # print(moves)
-
         return moves
     
     def do_move(self, position: int, move: int) -> int:
@@ -153,7 +151,7 @@ class Hashi(Game):
             max_x = max(n[0] for n in nodes)
             max_y = max(n[1] for n in nodes)
             
-            # midpoints r integers, scaling yb 2
+            # midpoints are integers, scaling by 2
             width = (max_x * 2) + 1
             height = (max_y * 2) + 1
             gui_array = ["-"] * (width * height)
@@ -270,14 +268,6 @@ class Hashi(Game):
         Returns the position from a string representation of the position.
         Input string is StringMode.Readable.
         """
-        # position = 0
-        # lines = strposition.strip().split('\n')
-        # for i, line in enumerate(lines):
-        #     if not line:
-        #         continue
-        #     bridge_count = int(line.split('bridges: ')[1])
-        #     position += bridge_count * (3 ** i)
-
         return int(strposition.strip())
 
     def move_to_string(self, move: int, mode: StringMode) -> str:
