@@ -1,14 +1,18 @@
+from .chipschallenge import ChipsChallenge
 from .clobber import Clobber
+from .flowfree import FlowFree
 from .horses import Horses
 from .pancakes import Pancakes
-from .flowfree import FlowFree
+from .test import Test
 from models import *
 
 game_list = {
+    "chipschallenge": ChipsChallenge,
     "clobber": Clobber,
+    "flowfree": FlowFree,
     "horses": Horses,
     "pancakes": Pancakes,
-    "flowfree": FlowFree,
+    "test": Test,
 }
 
 def validate(game_id: str, variant_id: str) -> bool:
