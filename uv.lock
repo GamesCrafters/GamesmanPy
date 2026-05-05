@@ -102,7 +102,6 @@ dependencies = [
     { name = "interfaces" },
     { name = "models" },
     { name = "pandas" },
-    { name = "psutil" },
     { name = "server" },
     { name = "solver" },
     { name = "waitress" },
@@ -118,7 +117,6 @@ requires-dist = [
     { name = "interfaces", editable = "interfaces" },
     { name = "models", editable = "models" },
     { name = "pandas", specifier = ">=2.3.3" },
-    { name = "psutil", specifier = ">=7.2.2" },
     { name = "server", editable = "server" },
     { name = "solver", editable = "solver" },
     { name = "waitress", specifier = ">=3.0.2" },
@@ -397,6 +395,12 @@ wheels = [
 name = "server"
 version = "0.1.0"
 source = { editable = "server" }
+dependencies = [
+    { name = "psutil" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "psutil" }]
 
 [[package]]
 name = "six"
