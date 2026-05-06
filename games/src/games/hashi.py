@@ -252,7 +252,6 @@ class Hashi(Game):
         
         grid_display = header + "\n" + "\n".join(rows)
 
-        # 5. Build Metadata Output
         output = []
         for e in range(self.num_edges):
             b_count = (position // (3 ** e)) % 3
