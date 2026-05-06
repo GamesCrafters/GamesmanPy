@@ -1,6 +1,6 @@
 from models import Game, Value, StringMode
 
-class ASnakestale(Game):
+class Snakestale(Game):
     id = "snakestale"
     n_players = 1
     cyclic = True
@@ -36,9 +36,6 @@ class ASnakestale(Game):
                         "water": [5, 9],
                         "land_snakes": [0, 4, 8, 12, 13, 14, 10, 6, 2],
                         "water_snakes": []
-<<<<<<< HEAD
-                        }}
-=======
                         },
                 "lvl5":{"board": "4x5",
                         "obstacle": [6, 7, 12, 13],
@@ -48,19 +45,16 @@ class ASnakestale(Game):
                         "water": [18],
                         "land_snakes": [16, 15, 10, 11],
                         "water_snakes": []}}
->>>>>>> fc966d6 (lvl5)
-
-
 
 
     def __init__(self, variant_id: str):
         """
         Define instance variables here (i.e. variant information)
         """
-        if variant_id not in ASnakestale.variants:
+        if variant_id not in Snakestale.variants:
             raise ValueError("Variant not defined")
         self.variant_id = variant_id
-        variant_data = ASnakestale.variants[variant_id]
+        variant_data = Snakestale.variants[variant_id]
         rows_str, cols_str = variant_data["board"].split('x')
         self.rows = int(rows_str)
         self.cols = int(cols_str)
@@ -80,13 +74,9 @@ class ASnakestale(Game):
         self.all_movable_snakes = [self.player] + self.obstacle_snakes
 
 
-
-
     def start(self) -> int:
         all_snakes = [s.cells for s in self.all_movable_snakes]
         return self.hash(all_snakes)
-
-
 
 
     def generate_moves(self, position: int) -> list[int]:
@@ -101,7 +91,8 @@ class ASnakestale(Game):
         for idx, snake_obj in enumerate(self.all_movable_snakes):
             snake_obj.cells = all_snakes[idx]
         return moves
-               
+
+      
     def do_move(self, position: int, move: int) -> int:
         """
         Returns the resulting position of applying move to position.
@@ -111,8 +102,6 @@ class ASnakestale(Game):
         snake = all_snakes[snake_idx]
         all_snakes[snake_idx] = [target] + snake[:-1]
         return self.hash(all_snakes)
-
-
 
 
     def primitive(self, position: int):
@@ -125,8 +114,6 @@ class ASnakestale(Game):
         if not moves:
             return Value.Loss
         return None
-
-
 
 
     def to_string(self, position: int, mode: StringMode) -> str:
@@ -165,9 +152,6 @@ class ASnakestale(Game):
             key = ''.join(sorted([d1, d2]))
             return body_chars.get(key, next(iter(body_chars.values())))
 
-
-
-
         def tail_char(cells, tail_chars):
             if len(cells) < 2:
                 return tail_chars['U']
@@ -179,20 +163,14 @@ class ASnakestale(Game):
         water_heads  = {'U': 'E', 'D': 'F', 'L': 'G', 'R': 'I'}
 
 
-
-
         player_body = {'DU': 'q', 'LR': 'p', 'DR': 'b', 'DL': 'c', 'RU': 'd', 'LU': 'e'}
         land_body   = {'DU': 'Q', 'LR': 'P', 'DR': 'M', 'DL': 'n', 'RU': 'H', 'LU': 'V'} # pick unused chars
         water_body  = {'DU': 'x', 'LR': 'y', 'DR': 'z', 'DL': 'f', 'RU': 'g', 'LU': 'u'}
 
 
-
-
         player_tail = {'U': 'T', 'D': 'J', 'L': 'K', 'R': 'N'}
         land_tail  = {'U': 'W', 'D': 'S', 'L': 'Y', 'R': 'Z'} # pick unused chars
         water_tail  = {'U': 'o', 'D': 'm', 'L': 't', 'R': 'j'}
-
-
 
 
         symbols = [(head_char, player_heads, player_body, player_tail),
@@ -218,87 +196,11 @@ class ASnakestale(Game):
         return s
 
 
-
-
-    # def from_string(self, strposition: str) -> int:
-    #     """
-    #     Returns the position from a string representation of the position.
-    #     Input string is StringMode.Readable.
-    #     """
-    #     #flat = strposition.replace('\n', '')
-    #     if not strposition or strposition.strip() == '':
-    #         return self.start()
-       
-    #     flat = strposition.replace('\n', '')
-    #     # Map each character back to snake index and segment role
-    #     # Rebuild cell lists from board characters
-    #     player_heads = {'w', 'v', 'i', 'r'}
-    #     land_heads   = {'A', 'B', 'C', 'D'}
-    #     water_heads  = {'E', 'F', 'G', 'I'}
-       
-    #     n = len(self.all_movable_snakes)
-    #     # We'll reconstruct ordered cells by reading head direction + body
-    #     # Strategy: find head, then follow neck->tail using adjacency
-    #     cells_by_snake = [[] for _ in range(n)]
-    #     head_positions = {}
-
-
-
-
-    #     for i, ch in enumerate(flat):
-    #         if ch in player_heads:
-    #             head_positions[0] = i
-    #         elif ch in land_heads:
-    #             head_positions[1] = i
-    #         elif ch in water_heads:
-    #             head_positions[2] = i
-
-
-
-
-    #     def follow_snake(head, snake_idx, segment_chars):
-    #         cells = [head]
-    #         current = head
-    #         for _ in range(self.all_movable_snakes[snake_idx].length - 1):
-    #             r, c = divmod(current, self.cols)
-    #             for dr, dc in [(-1,0),(1,0),(0,-1),(0,1)]:
-    #                 nr, nc = r+dr, c+dc
-    #                 if 0 <= nr < self.rows and 0 <= nc < self.cols:
-    #                     neighbor = nr * self.cols + nc
-    #                     if neighbor not in cells and flat[neighbor] in segment_chars:
-    #                         cells.append(neighbor)
-    #                         current = neighbor
-    #                         break
-    #         return cells
-       
-    #     player_body_chars = {'q', 'p', 'b', 'c', 'd', 'e'}
-    #     player_tail_chars = {'T', 'J', 'K', 'N'}
-    #     land_body_chars   = {'Q', 'P', 'M', 'n', 'H', 'V'}
-    #     land_tail_chars   = {'W', 'S', 'Y', 'Z'}
-    #     water_body_chars  = {'x', 'y', 'z', 'f', 'g', 'u'}
-    #     water_tail_chars  = {'o', 'm', 't', 'j'}
-
-
-
-
-    #     body_tail_chars = [
-    #         player_body_chars | player_tail_chars,
-    #         land_body_chars   | land_tail_chars,
-    #         water_body_chars  | water_tail_chars,
-    #         ]
-       
-    #     for idx in range(n):
-    #         if idx in head_positions:
-    #             cells_by_snake[idx] = follow_snake(head_positions[idx], idx, body_tail_chars[idx])
-    #     return self.hash(cells_by_snake)
-
-
     def from_string(self, strposition: str) -> int:
         if not strposition or strposition.strip() == '':
             return self.start()
        
         flat = strposition.replace('\n', '')
-        print(f"DEBUG from_string input: '{flat}'")
        
         player_heads = {'w', 'v', 'i', 'r'}
         land_heads   = {'A', 'B', 'C', 'D'}
@@ -316,8 +218,6 @@ class ASnakestale(Game):
                 head_positions[1] = i
             elif ch in water_heads:
                 head_positions[2] = i
-        print(f"DEBUG head_positions: {head_positions}, chars: {[(k, flat[v]) for k,v in head_positions.items()]}")
-
 
         player_body_chars = {'q', 'p', 'b', 'c', 'd', 'e'}
         player_tail_chars = {'T', 'J', 'K', 'N'}
@@ -378,37 +278,23 @@ class ASnakestale(Game):
             return cells
 
 
-
-
         for idx in range(n):
             if idx in head_positions:
                 cells_by_snake[idx] = follow_snake(
                     head_positions[idx], idx, body_tail_chars[idx], tail_maps[idx]
                 )
-                print(f"DEBUG snake {idx} cells: {cells_by_snake[idx]}, chars: {[flat[c] for c in cells_by_snake[idx]]}")
         return self.hash(cells_by_snake)
-
 
     def move_to_string(self, move: int, mode: StringMode) -> str:
         total_cells = self.rows * self.cols
         snake_idx, target = divmod(move, total_cells)
         if mode == StringMode.AUTOGUI:
             head = self.all_movable_snakes[snake_idx].cells[0]
-            print(f"DEBUG move_to_string: snake={snake_idx} head={head} target={target} cells={self.all_movable_snakes[snake_idx].cells}")
             return f'M_{head}_{target}_x'
         r, c = divmod(target, self.cols)
         snake_names = ["Player", "LandSnake", "WaterSnake"]
         name = snake_names[snake_idx] if snake_idx < len(snake_names) else f"Snake{snake_idx}"
         return f"{name} ({r}, {c})"
-   
-        #total_cells = self.rows * self.cols
-        #snake_idx, target = divmod(move, total_cells)
-        #if mode == StringMode.AUTOGUI:
-        #    return f'M_{move}_{target}_x' # change move to to current state
-        #r, c = divmod(target, self.cols)
-        #snake_names = ["Player", "LandSnake", "WaterSnake"]
-        #name = snake_names[snake_idx] if snake_idx < len(snake_names) else f"Snake{snake_idx}"
-        #return f"{name} ({r}, {c})"
    
     def hash(self, all_snakes: list[list[int]]) -> int:
         """
@@ -421,9 +307,6 @@ class ASnakestale(Game):
             for cell in snake_cells:
                 result = result * total_cells + cell
         return result
-
-
-
 
     def unhash(self, position: int) -> list[list[int]]:
         """
@@ -441,13 +324,6 @@ class ASnakestale(Game):
         return list(reversed(all_snakes))
 
 
-
-
-
-
-
-
-       
 class Snake:
     def __init__(self, cells, length):
         self.cells = cells        
