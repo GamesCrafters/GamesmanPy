@@ -2,9 +2,9 @@ from .chipschallenge import ChipsChallenge
 from .clobber import Clobber
 from .horses import Horses
 from .pancakes import Pancakes
-from .sokoban import Sokoban
+from .sokobaniq import SokobanIQ
+from .sokobanlarge import SokobanLarge
 from .test import Test
-from .sokoban import Sokoban
 from models import *
 
 game_list = {
@@ -12,7 +12,8 @@ game_list = {
     "clobber": Clobber,
     "horses": Horses,
     "pancakes": Pancakes,
-    "sokoban": Sokoban,
+    "sokobaniq": SokobanIQ,
+    "sokobanlarge": SokobanLarge,
     "test": Test
 }
 
