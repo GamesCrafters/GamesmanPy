@@ -258,8 +258,6 @@ class Hashi(Game):
             (ex1, ey1), (ex2, ey2) = self.edges[e]
             output.append(f'Edge {e}: ({ex1}, {ey1})-({ex2}, {ey2}), bridges: {b_count}')
 
-        print(grid_display)
-        print('\n'.join(output))
         return str(position)
 
     def from_string(self, strposition: str) -> int:
