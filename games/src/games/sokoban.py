@@ -412,12 +412,12 @@ class Sokoban(Game):
             board = [position[idx * self.column_size : (idx + 1) * self.column_size] for idx in range(self.row_size)]
             return "\n".join(board)
         elif mode == StringMode.Readable:
-            return position.replace(' ', 't').replace('#', 'W').replace("@", "p").replace("$", "b").replace("*", "g").replace("+", "P")
+            return position.replace(' ', 't').replace('#', 'W').replace("@", "p").replace("$", "b").replace("*", "g").replace("+", "P").replace(".", "B")
         else:
-            return "1_" + position.replace(' ', 't').replace('#', 'W').replace("@", "p").replace("$", "b").replace("*", "g").replace("+", "P")
+            return "1_" + position.replace(' ', 't').replace('#', 'W').replace("@", "p").replace("$", "b").replace("*", "g").replace("+", "P").replace(".", "B")
 
     def from_string(self, strposition: str) -> str:
-        clean_pos = strposition.replace('t', ' ').replace('W', '#').replace("p", "@").replace("b", "$").replace("g", "*").replace("P", "+")
+        clean_pos = strposition.replace('t', ' ').replace('W', '#').replace("p", "@").replace("b", "$").replace("g", "*").replace("P", "+").replace("B", ".")
         return clean_pos.replace("\n", "").replace("\r", "")
     
     def get_pos_idx(self, position: str):
