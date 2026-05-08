@@ -4,6 +4,7 @@ from .util import Value, StringMode
 
 
 class Game(ABC):
+    uses_half_moves = False
     @abstractmethod
     def __init__(self, variant_id: str):
         pass
@@ -63,3 +64,9 @@ class Game(ABC):
     
     def unhash_ext(self, hashed_pos) -> int:
         return hashed_pos
+    
+    def generate_half_moves(self, position):
+        return self.generate_moves(position)
+    
+    def do_half_move(self, position, move):
+        return self.do_move(position, move)
