@@ -7,8 +7,6 @@ TEAL_DIAMOND_PATHS = [(TOP_LEFT, BOTTOM_LEFT), (BOTTOM_LEFT, TOP_LEFT), (TOP_RIG
 ORANGE_T_PATHS = [(TOP_LEFT, BOTTOM_RIGHT), (BOTTOM_RIGHT, TOP_LEFT), (TOP_RIGHT, BOTTOM_RIGHT), (BOTTOM_RIGHT, TOP_RIGHT)]
 YELLOW_T_PATHS = [(TOP_LEFT, BOTTOM_LEFT), (BOTTOM_LEFT, TOP_LEFT), (TOP_RIGHT, BOTTOM_LEFT), (BOTTOM_LEFT, TOP_RIGHT)]
 MAGENTA_4WAY_PATHS = [(TOP_LEFT, BOTTOM_RIGHT), (BOTTOM_RIGHT, TOP_LEFT), (TOP_RIGHT, BOTTOM_LEFT), (BOTTOM_LEFT, TOP_RIGHT)]
-
-# 2x2 demo：边 0..3 = 上/右/下/左
 TOP, RIGHT, BOTTOM, LEFT = 0, 1, 2, 3
 STRAIGHT_PATHS = [(0, 2), (2, 0)]
 L_PATHS = [(0, 1), (1, 0)]
@@ -741,7 +739,6 @@ class MarbleCircuit(Game):
             path.append((slot, side))
 
     def _trace_all_balls_ch23(self, board: list[int]) -> list[tuple[int, Optional[int], list[tuple[int, int]]]]:
-        """[(球号1-8, 出口或None, 路径), ...]。"""
         return [
             (i + 1, ex, path)
             for i in range(8)

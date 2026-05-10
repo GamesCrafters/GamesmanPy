@@ -1,6 +1,5 @@
 from .clobber import Clobber
 from .horses import Horses
-from .lightsout import LightsOut
 from .marble_circuit import MarbleCircuit
 from .pancakes import Pancakes
 from .chipschallenge import ChipsChallenge
@@ -11,7 +10,6 @@ game_list = {
     "chipschallenge": ChipsChallenge,
     "clobber": Clobber,
     "horses": Horses,
-    "lightsout": LightsOut,
     "marble_circuit": MarbleCircuit,
     "pancakes": Pancakes,
     "test": Test,
