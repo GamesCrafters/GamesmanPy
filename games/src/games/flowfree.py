@@ -291,4 +291,4 @@ class FlowFree(Game):
             return str(move)
         sr, sc = divmod(src, SIZE)
         nr, nc = divmod(neighbor, SIZE)
-        return f"{sr},{sc}->{nr},{nc}"
+        return f"{sr},{sc}-{nr},{nc}"
