@@ -282,10 +282,13 @@ class FlowFree(Game):
                 return f"M_{dot}_{neighbor}"
             return f"A_-_{move}_x"
         if move >= _CONT_OFF:
-            neighbor = move % NCELLS
+            raw = move - _CONT_OFF
+            src, neighbor = divmod(raw, NCELLS)
         elif move >= _CMB_OFF:
-            neighbor = (move - _CMB_OFF) % NCELLS
+            raw = move - _CMB_OFF
+            src, neighbor = divmod(raw, NCELLS)
         else:
-            neighbor = move
-        r, c = divmod(neighbor, SIZE)
-        return f"{r},{c}"
+            return str(move)
+        sr, sc = divmod(src, SIZE)
+        nr, nc = divmod(neighbor, SIZE)
+        return f"{sr},{sc}->{nr},{nc}"
