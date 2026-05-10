@@ -3,9 +3,9 @@ from typing import Optional
 from collections import deque
 import math
 
-class Sokoban(Game):
-    id = 'sokoban'
-    variants = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"]
+class SokobanIQ(Game):
+    id = 'sokobaniq'
+    variants = ["1", "2", "3", "4", "6", "7", "8", "9", "10"]
     n_players = 1
     cyclic = True
     max_spaces = 250 # max number of squares (take max length x width of all levels)
@@ -15,7 +15,7 @@ class Sokoban(Game):
         """
         Define instance variables and the starting board.
         """
-        if variant_id not in Sokoban.variants:
+        if variant_id not in SokobanIQ.variants:
             raise ValueError("Variant not defined")
         
         self._variant_id = variant_id
@@ -35,7 +35,7 @@ class Sokoban(Game):
         """
 
         match self._variant_id:
-            # roughly 2,035,800 box arrangements
+            # roughly 2,441,925 box arrangements
             # equivalent to Level 1 from the online Sokoban player
             case "1":
                 self.column_size = 8
@@ -328,40 +328,22 @@ class Sokoban(Game):
         if position.find('$') == -1:
             return Value.Win
 
-        blocker = {'#', '$', '*'} 
+        blocker = {'#', '$', '*'}
         col = self.column_size
 
         idx = position.find('$')
-
-        #check to see if any box is surrounded on all 4 sides by a blocker
+        
         while idx != -1:
+            locked_horizontally = (position[idx - 1] in blocker) or (position[idx + 1] in blocker)
             
-            if idx in self.dead_squares:
-                return Value.Loss
-                
-            if position[idx - 1] in blocker and \
-               position[idx - col] in blocker and \
-               position[idx - col - 1] in blocker:
-                return Value.Loss
-                
-            if position[idx + 1] in blocker and \
-               position[idx - col] in blocker and \
-               position[idx - col + 1] in blocker:
-                return Value.Loss
-
-            if position[idx - 1] in blocker and \
-               position[idx + col] in blocker and \
-               position[idx + col - 1] in blocker:
-                return Value.Loss
-                
-            if position[idx + 1] in blocker and \
-               position[idx + col] in blocker and \
-               position[idx + col + 1] in blocker:
-                return Value.Loss
+            locked_vertically = (position[idx - col] in blocker) or (position[idx + col] in blocker)
+            
+            if not (locked_horizontally and locked_vertically):
+                return None
 
             idx = position.find('$', idx + 1)
 
-        return None
+        return Value.Loss
 
 
     def hash_ext(self, position: str) -> int:
@@ -412,12 +394,12 @@ class Sokoban(Game):
             board = [position[idx * self.column_size : (idx + 1) * self.column_size] for idx in range(self.row_size)]
             return "\n".join(board)
         elif mode == StringMode.Readable:
-            return position.replace(' ', 't').replace('#', 'W').replace("@", "p").replace("$", "b").replace("*", "g").replace("+", "P")
+            return position.replace(' ', 't').replace('#', 'W').replace("@", "p").replace("$", "b").replace("*", "g").replace("+", "P").replace(".", "G")
         else:
-            return "1_" + position.replace(' ', 't').replace('#', 'W').replace("@", "p").replace("$", "b").replace("*", "g").replace("+", "P")
+            return "1_" + position.replace(' ', 't').replace('#', 'W').replace("@", "p").replace("$", "b").replace("*", "g").replace("+", "P").replace(".", "G")
 
     def from_string(self, strposition: str) -> str:
-        clean_pos = strposition.replace('t', ' ').replace('W', '#').replace("p", "@").replace("b", "$").replace("g", "*").replace("P", "+")
+        clean_pos = strposition.replace('t', ' ').replace('W', '#').replace("p", "@").replace("b", "$").replace("g", "*").replace("P", "+").replace("G", ".")
         return clean_pos.replace("\n", "").replace("\r", "")
     
     def get_pos_idx(self, position: str):

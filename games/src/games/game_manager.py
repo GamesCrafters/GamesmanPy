@@ -4,7 +4,8 @@ from .flowfree import FlowFree
 from .horses import Horses
 from .lunarlockout import LunarLockout
 from .pancakes import Pancakes
-from .sokoban import Sokoban
+from .sokobaniq import SokobanIQ
+from .sokobanlarge import SokobanLarge
 from .test import Test
 from models import *
 
@@ -15,8 +16,9 @@ game_list = {
     "horses": Horses,
     "lunarlockout": LunarLockout,
     "pancakes": Pancakes,
-    "sokoban": Sokoban,
-    "test": Test,
+    "sokobaniq": SokobanIQ,
+    "sokobanlarge": SokobanLarge,
+    "test": Test
 }
 
 def validate(game_id: str, variant_id: str) -> bool:
