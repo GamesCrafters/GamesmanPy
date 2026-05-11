@@ -13,8 +13,6 @@ class SqliteDB(GameDB):
 
         file_name = f'{id}_{variant}'
         self.path = f'{Path(__file__).resolve().parents[2]}/db/{file_name}.db'
-        if not ro:
-            Path(self.path).parent.mkdir(parents=True, exist_ok=True)
         self.exists = os.path.exists(self.path)
         uri_path = self.path
         if ro:
@@ -23,8 +21,7 @@ class SqliteDB(GameDB):
         self.cursor = self.db.cursor()
 
     def __del__(self):
-        if hasattr(self, "db"):
-            self.close()
+        self.close()
 
     def create_table(self, overwrite=True):
         '''
