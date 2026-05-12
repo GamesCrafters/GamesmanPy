@@ -34,7 +34,7 @@ class StormySeas(Game):
 
             # use ternary digits to represent shifts?
             curr_shift_string = "11211"
-            boat_pos = ["24", "12"] # first two digits is position in x-y where 0, 0 is top left square on board (always facing DOWN and always length 2)
+            boat_pos = ["12", "24"] # first two digits is position in x-y where 0, 0 is top left square on board (always facing DOWN and always length 2)
             self.boat_pos = boat_pos
             
             self.row_length = len(self.board_rows[0])
