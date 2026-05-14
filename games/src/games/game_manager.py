@@ -1,6 +1,7 @@
 from .chipschallenge import ChipsChallenge
 from .clobber import Clobber
 from .flowfree import FlowFree
+from .hashi import Hashi
 from .horses import Horses
 from .lunarlockout import LunarLockout
 from .pancakes import Pancakes
@@ -13,6 +14,7 @@ game_list = {
     "chipschallenge": ChipsChallenge,
     "clobber": Clobber,
     "flowfree": FlowFree,
+    "hashi": Hashi,
     "horses": Horses,
     "lunarlockout": LunarLockout,
     "pancakes": Pancakes,
