@@ -4,6 +4,8 @@ from .flowfree import FlowFree
 from .horses import Horses
 from .lunarlockout import LunarLockout
 from .pancakes import Pancakes
+from .sokobaniq import SokobanIQ
+from .sokobanlarge import SokobanLarge
 from .test import Test
 from models import *
 
@@ -14,6 +16,8 @@ game_list = {
     "horses": Horses,
     "lunarlockout": LunarLockout,
     "pancakes": Pancakes,
+    "sokobaniq": SokobanIQ,
+    "sokobanlarge": SokobanLarge,
     "test": Test,
 }
 
