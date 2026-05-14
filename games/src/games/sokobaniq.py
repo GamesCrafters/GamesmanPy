@@ -100,25 +100,6 @@ class SokobanIQ(Game):
                     "  #######"
                 )
 
-            # roughly 74,974,368 box arrangements
-            case "5":
-                self.column_size = 23
-                self.row_size = 12
-                self.starting_pos = (
-                    "    #####              "
-                    "    #   #              "
-                    "    #$  #              "
-                    "  ###  $###            "
-                    "  #  $  $ #            "
-                    "### # ### #            "
-                    "#   # ### #      ######"
-                    "#   # ### ########  ..#"
-                    "# $  $              ..#"
-                    "##### ####  #@####  ..#"
-                    "    #       ###  ######"
-                    "    #########          "
-                )
-
             # roughly 5,985 box arrangements
             case "6":
                 self.column_size = 9
@@ -191,22 +172,6 @@ class SokobanIQ(Game):
                     "# $$$ #"
                     "#. . .#"
                     "#######"
-                )
-
-            # roughly 4,078,044,000 box arrangements
-            case "11":
-                self.column_size = 11
-                self.row_size = 9
-                self.starting_pos = (
-                    "  #########"
-                    "###   #   #"
-                    "#  $. * $ #"
-                    "# #.#.#.# #"
-                    "# $ $@$ $ #"
-                    "# #.#.#.# #"
-                    "# $ * .$  #"
-                    "#   #######"
-                    "#####      "
                 )
 
             # roughly 28,754,545,040 box arrangements

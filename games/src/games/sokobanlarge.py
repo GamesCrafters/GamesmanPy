@@ -35,71 +35,6 @@ class SokobanLarge(Game):
         """
 
         match self._variant_id:
-            # roughly 2,035,800 box arrangements
-            # equivalent to Level 1 from the online Sokoban player
-            case "1":
-                self.column_size = 8
-                self.row_size = 9
-                self.starting_pos = (
-                    "########"
-                    "###   ##"
-                    "#.@$  ##"
-                    "### $.##"
-                    "#.##$ ##"
-                    "# # . ##"
-                    "#$ *$$.#"
-                    "#   .  #"
-                    "########"
-                )
-
-            # roughly 78 box arrangements
-            case "2":
-                self.column_size = 8
-                self.row_size = 8
-                self.starting_pos = (
-                    "  ###   "
-                    "  # #   "
-                    "  #.#   "
-                    "###$#   "
-                    "#. $@###"
-                    "####   #"
-                    "   #   #"
-                    "   #####"
-                )
-
-            # roughly 123,410 box arrangements
-            case "3":
-                self.column_size = 11
-                self.row_size = 10
-                self.starting_pos = (
-                    "########## "
-                    "#        # "
-                    "# $$ $   # "
-                    "#      ### "
-                    "####   #   "
-                    "   # @ #   "
-                    "   # $ #   "
-                    "####   ####"
-                    "#....     #"
-                    "###########"
-                )
-
-            # roughly 17,550 box arrangements
-            case "4":
-                self.column_size = 9
-                self.row_size = 9
-                self.starting_pos = (
-                    "  #####  "
-                    "  #   #  "
-                    "###$  #  "
-                    "#   $ #  "
-                    "#   @ ###"
-                    "##### $ #"
-                    "  ### $ #"
-                    "  #.... #"
-                    "  #######"
-                )
-
             # roughly 74,974,368 box arrangements
             case "5":
                 self.column_size = 23
@@ -119,80 +54,6 @@ class SokobanLarge(Game):
                     "    #########          "
                 )
 
-            # roughly 5,985 box arrangements
-            case "6":
-                self.column_size = 9
-                self.row_size = 8
-                self.starting_pos = (
-                    "  ####   "
-                    "  #  #   "
-                    "###  ####"
-                    "#  +*   #"
-                    "# $.. $ #"
-                    "### $####"
-                    "  #  #   "
-                    "  ####   "
-                )
-
-
-            # roughly 2,380 box arrangements
-            case "7":
-                self.column_size = 6
-                self.row_size = 7
-                self.starting_pos = (
-                    "####  "
-                    "#@ ###"
-                    "# $$.#"
-                    "#  $.#"
-                    "# $ .#"
-                    "# # .#"
-                    "######"
-                )
-            
-            # roughly 1,560,780 box arrangements
-            case "8":
-                self.column_size = 9
-                self.row_size = 8
-                self.starting_pos = (
-                    "   ##### "
-                    "####.  ##"
-                    "# $.$.  #"
-                    "#@$# #$ #"
-                    "# $. .  #"
-                    "####$#$ #"
-                    "  #. .  #"
-                    "  #######"
-                )
-
-            # roughly 169,911 box arrangements
-            case "9":
-                self.column_size = 9
-                self.row_size = 8
-                self.starting_pos = (
-                    "   ######"
-                    "####.  @#"
-                    "#  $$$  #"
-                    "#.##.##.#"
-                    "#   $   #"
-                    "#  $.# ##"
-                    "###    # "
-                    "  ###### "
-                )
-            
-            # roughly 1,081,575 box arrangements
-            case "10":
-                self.column_size = 7
-                self.row_size = 7
-                self.starting_pos = (
-                    "#######"
-                    "#. . .#"
-                    "# $$$ #"
-                    "#.$@$.#"
-                    "# $$$ #"
-                    "#. . .#"
-                    "#######"
-                )
-
             # roughly 4,078,044,000 box arrangements
             case "11":
                 self.column_size = 11
@@ -209,38 +70,6 @@ class SokobanLarge(Game):
                     "#####      "
                 )
 
-            # roughly 28,754,545,040 box arrangements
-            case "12":
-                self.column_size = 9
-                self.row_size = 9
-                self.starting_pos = (
-                    " ####### "
-                    "##  *  ##"
-                    "# .@. . #"
-                    "# $ *   #"
-                    "#*$$*$$*#"
-                    "#   * $ #"
-                    "# . . . #"
-                    "##  *  ##"
-                    " ####### "
-                )
-            
-            #roughly 246,463,222,084 box arrangements
-            case "13":
-                self.column_size = 14
-                self.row_size = 10
-                self.starting_pos = (
-                    "############  "
-                    "#..  #     ###"
-                    "#..  # $  $  #"
-                    "#..  #$####  #"
-                    "#..    @ ##  #"
-                    "#..  # #  $  #"
-                    "###### ##$ $ #"
-                    "  # $  $ $ $ #"
-                    "  #    #     #"
-                    "  ############"
-                )
         self._compute_dead_squares()
            
     def start(self) -> str:
