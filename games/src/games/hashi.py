@@ -252,15 +252,12 @@ class Hashi(Game):
         
         grid_display = header + "\n" + "\n".join(rows)
 
-        # 5. Build Metadata Output
         output = []
         for e in range(self.num_edges):
             b_count = (position // (3 ** e)) % 3
             (ex1, ey1), (ex2, ey2) = self.edges[e]
             output.append(f'Edge {e}: ({ex1}, {ey1})-({ex2}, {ey2}), bridges: {b_count}')
 
-        print(grid_display)
-        print('\n'.join(output))
         return str(position)
 
     def from_string(self, strposition: str) -> int:
