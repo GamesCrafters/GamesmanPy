@@ -1,6 +1,6 @@
 import sys
 sys.path[:0] = ['games/src', 'models/src', 'interfaces/src', 'server/src', 'solver/src']
-from games.stormyseassmall import StormySeas
+from games.stormyseas import StormySeas
 
 g = StormySeas('a')
 print('row_length', g.row_length, 'num_rows', g.num_rows)

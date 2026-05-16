@@ -1,13 +1,9 @@
-
-# THIS FUNCTION IS DEFUNCT, PLEASE LOOK AT STORMYSEASSMALL INSTEAD
-
-
 from models import Game, Value, StringMode
 from typing import Optional
 
 class StormySeas(Game):
     id = 'stormyseas'
-    variants = ["a", "regular"]  # 'regular' maps to 'a' in the API
+    variants = ["a"]
     n_players = 1
     cyclic = False
     colors = ["R", "B"]
@@ -26,14 +22,19 @@ class StormySeas(Game):
         self.num_rows = 0
         self.win_condition = ""  # Example win condition
 
-    def start(self) -> int:
-        if self._variant_id in ("a", "regular"):
+        if self._variant_id == "a":
             self.default_rows = ["1011100","1010100","1101100","1011100","1110100"]
+            self.row_length = len(self.default_rows[0])
+            self.num_rows = len(self.default_rows)
+            self.win_condition = "43"
+
+    def start(self) -> int:
+        if self._variant_id == "a":
             self.board_rows = ["0101110","0101010","0011011","0101110","0111010"]
 
             # use ternary digits to represent shifts?
             curr_shift_string = "11211"
-            boat_pos = ["24", "12"] # first two digits is position in row-col where 0, 0 is top left square on board (always facing DOWN and always length 2)
+            boat_pos = ["24", "12"] # first two digits is position in x-y where 0, 0 is top left square on board (always facing DOWN and always length 2)
             self.boat_pos = boat_pos
             
             self.row_length = len(self.board_rows[0])
@@ -232,11 +233,14 @@ class StormySeas(Game):
         """
         Returns the resulting position of applying move to position.
         """
-        # If move is already a position (from generate_moves), return it directly
-        # Otherwise, this could be an index into the moves list
+        # generate_moves returns a list of valid next positions
         possible_moves = self.generate_moves(position)
+        
+        # If move is an index into the possible_moves list, return that position
         if isinstance(move, int) and 0 <= move < len(possible_moves):
             return possible_moves[move]
+        
+        # Otherwise assume move is already a position hash
         return move
 
     def primitive(self, position: int) -> Optional[Value]:
@@ -254,7 +258,9 @@ class StormySeas(Game):
         return x + y * self.row_length  # board is row_length columns wide
 
     def to_string(self, position: int, mode: StringMode) -> str:
-        
+        """
+        Returns a string representation of the position based on the given mode.
+        """
         string_rep = self.translate(self.unhash(position))
         waveString = string_rep[:self.row_length * self.num_rows]
         boatString = string_rep[self.row_length * self.num_rows:]
@@ -262,15 +268,17 @@ class StormySeas(Game):
         # pretend that the center of each tile is a wave or not
         if mode == StringMode.AUTOGUI:
             #translate the waves
-            waves = ['W' if char == '0' else '-' for char in waveString]
-            #translate the boats; need to be coordinates in fashion of coords
+            
+            waves = ['W' if char == '1' else '-' for char in waveString]
             boat = []
+            #translate the boats; need to be coordinates in fashion of coords
             red_row = int(boatString[0]);
             red_col = int(boatString[1]);
             blue_row = int(boatString[2]);
             blue_col = int(boatString[3]);
-            for i in range(0, 7):
-                for j in range(0, 5):
+
+            for j in range(0, 5):
+                for i in range(0, 7):
                     if j == red_row and i == red_col:
                         boat += ['R']
                     elif j == blue_row and i == blue_col:
@@ -287,12 +295,13 @@ class StormySeas(Game):
                 stringBoat += string
 
             return "1_" + stringWave + stringBoat
-    
-        elif mode == StringMode.READABLE:
 
-            
-        # Build base grid from wave data
-            string_view = list(''.join(['~' if x == '1' else '.' for x in waveString]))
+        
+        else:
+
+
+            # Build base grid from wave data
+            string_view = list(''.join(['w' if x == '1' else 'o' for x in waveString]))
 
             i = 0
             color = 0
@@ -312,33 +321,26 @@ class StormySeas(Game):
                 i += 2
 
             string_view = ''.join(string_view)
-            return "\n".join([string_view[self.row_length*x: self.row_length*x + self.row_length] for x in range(self.num_rows)])
+            return string_view
 
     def from_string(self, strposition: str) -> int:
         """
         Returns the position from a string representation of the position.
         Input string is StringMode.Readable.
         """
-        # Ensure the game is initialized with required dimensions
-        if self.num_rows == 0 or self.row_length == 0:
-            # Initialize with variant "a" defaults
-            if self._variant_id in ("a", "regular"):
-                self.default_rows = ["1011100","1010100","1101100","1011100","1110100"]
-                self.board_rows = ["0101110","0101010","0011011","0101110","0111010"]
-                self.boat_pos = ["24", "12"]
-                self.row_length = len(self.board_rows[0])
-                self.num_rows = len(self.board_rows)
-                self.win_condition = "43"
-        
-        rows = strposition.split("\n")
+        expected_length = self.row_length * self.num_rows
+        if len(strposition) < expected_length:
+            raise ValueError(f"Invalid readable position length: expected at least {expected_length}, got {len(strposition)}")
+
+        rows = [strposition[i:i+self.row_length] for i in range(0, expected_length, self.row_length)]
         binary_str = ""
         boat_positions = {}  # color -> (row, col) of bottom cell
 
         for row_idx, row in enumerate(rows):
             for col_idx, char in enumerate(row):
-                if char == '~':
+                if char == 'w':
                     binary_str += '1'
-                elif char == '.':
+                elif char == 'o':
                     binary_str += '0'
                 elif char.upper() in self.colors:
                     binary_str += '0'  # boat cell is not a wave
@@ -361,6 +363,49 @@ class StormySeas(Game):
     
     def move_to_string(self, move: int, mode: StringMode) -> str:
         if mode != StringMode.Readable:
+
+            move_rep = self.translate(self.unhash(move))
+            move_rows = [move_rep[i:i+self.row_length] for i in range(0, self.row_length * self.num_rows, self.row_length)]
+            move_boat_str = move_rep[self.row_length * self.num_rows:]
+            move_boats = [move_boat_str[i:i+2] for i in range(0, len(move_boat_str), 2)]
+
+            curr_rows = self.board_rows
+            curr_boats = self.boat_pos
+
+            # Check if any boat moved
+            for boat_i, (curr_bp, move_bp) in enumerate(zip(curr_boats, move_boats)):
+                curr_row, curr_col = int(curr_bp[0]), int(curr_bp[1])
+                move_row, move_col = int(move_bp[0]), int(move_bp[1])
+                color = self.colors[boat_i].lower()
+
+                if curr_col != move_col or curr_row != move_row:
+                    if curr_row != move_row:
+                        direction = "down" if move_row > curr_row else "up"
+                        start = curr_row * self.row_length + curr_col + 42
+                        end = move_row * self.row_length + move_col + 42
+
+                        return f"M_{start}_{end}_x"
+
+                    else:
+                        direction = "left" if move_col < curr_col else "right"
+                        start = curr_row * self.row_length + curr_col + 42
+                        end = move_row * self.row_length + move_col + 42
+
+                        return f"M_{start}_{end}_x"
+
+            # Otherwise a wave row moved
+            for row_i, (curr_row, move_row) in enumerate(zip(curr_rows, move_rows)):
+                if curr_row != move_row:
+                    if move_row == curr_row[1:] + "0":
+                        start = row_i * self.row_length + 43
+                        end = row_i * self.row_length + 42
+
+                        return f"M_{start}_{end}_x"
+                    else:
+                        start = row_i * self.row_length + 47
+                        end = row_i * self.row_length + 48
+                        return f"M_{start}_{end}_x"
+
             return str(move)
 
         # Get current board state from self.board_rows and self.boat_pos
@@ -382,6 +427,7 @@ class StormySeas(Game):
             if curr_col != move_col or curr_row != move_row:
                 if curr_row != move_row:
                     direction = "down" if move_row > curr_row else "up"
+
                     return f"boat{color}-{direction}"
                 else:
                     direction = "left" if move_col < curr_col else "right"
@@ -402,9 +448,10 @@ class StormySeas(Game):
         Converts a string position to an integer hash.
         """
 
-        # strPos format: shifts (num_rows chars) + boats (2 chars per boat)
-        # The boats are in decimal format (e.g. "24" for row 2, col 4), convert to ternary
-        
+        # first 8 characters of strPos is the ternary rep of waves
+        # rest are regular numbers, first convert these to ternary via boatTernary
+        # put string back together, then the final string convert into an integer via int(x, 3)
+
         wavePosString = strPos[:self.num_rows]
         boatString = strPos[self.num_rows:]
         boatTernaryString = ""
@@ -418,18 +465,8 @@ class StormySeas(Game):
         return int(result, 3)
 
     def unhash(self, intPos: int) -> str:
-        # Ensure the game is initialized with required dimensions
-        if self.num_rows == 0 or len(self.boat_pos) == 0:
-            # Initialize with variant "a" defaults
-            if self._variant_id in ("a", "regular"):
-                self.default_rows = ["1011100","1010100","1101100","1011100","1110100"]
-                self.board_rows = ["0101110","0101010","0011011","0101110","0111010"]
-                self.boat_pos = ["24", "12"]
-                self.row_length = len(self.board_rows[0])
-                self.num_rows = len(self.board_rows)
-                self.win_condition = "43"
-        
-        total_length = self.num_rows + 5 * len(self.boat_pos)  # 5 shifts + 5 ternary digits per boat
+        boat_count = len(self.colors)
+        total_length = self.num_rows + 5 * boat_count  # 5 shifts + 5 ternary digits per boat
         strPos = self.toTernaryString(intPos).rjust(total_length, "0")
 
         wavePosString = strPos[:self.num_rows]
