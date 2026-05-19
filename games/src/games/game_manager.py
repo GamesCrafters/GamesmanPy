@@ -5,6 +5,7 @@ from .hashi import Hashi
 from .horses import Horses
 from .lunarlockout import LunarLockout
 from .pancakes import Pancakes
+from .snakestale import Snakestale
 from .sokobaniq import SokobanIQ
 from .sokobanlarge import SokobanLarge
 from .test import Test
@@ -18,6 +19,7 @@ game_list = {
     "horses": Horses,
     "lunarlockout": LunarLockout,
     "pancakes": Pancakes,
+    "snakestale": Snakestale,
     "sokobaniq": SokobanIQ,
     "sokobanlarge": SokobanLarge,
     "test": Test,
