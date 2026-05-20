@@ -27,7 +27,6 @@ game_list = {
     "sokobanlarge": SokobanLarge,
     "stormyseas": StormySeas,
     "test": Test,
-    
 }
 
 def validate(game_id: str, variant_id: str) -> bool:
