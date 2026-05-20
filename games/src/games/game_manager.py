@@ -3,6 +3,7 @@ from .clobber import Clobber
 from .flowfree import FlowFree
 from .hashi import Hashi
 from .horses import Horses
+from .klotski import Klotski
 from .lunarlockout import LunarLockout
 from .pancakes import Pancakes
 from .snakestale import Snakestale
@@ -17,6 +18,7 @@ game_list = {
     "flowfree": FlowFree,
     "hashi": Hashi,
     "horses": Horses,
+    "klotski": Klotski,
     "lunarlockout": LunarLockout,
     "pancakes": Pancakes,
     "snakestale": Snakestale,
