@@ -9,8 +9,8 @@ from .pancakes import Pancakes
 from .snakestale import Snakestale
 from .sokobaniq import SokobanIQ
 from .sokobanlarge import SokobanLarge
-from .test import Test
 from .stormyseas import StormySeas
+from .test import Test
 from models import *
 
 game_list = {
@@ -25,8 +25,9 @@ game_list = {
     "snakestale": Snakestale,
     "sokobaniq": SokobanIQ,
     "sokobanlarge": SokobanLarge,
+    "stormyseas": StormySeas,
     "test": Test,
-    "stormyseas": StormySeas
+    
 }
 
 def validate(game_id: str, variant_id: str) -> bool:
