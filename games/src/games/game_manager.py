@@ -1,17 +1,29 @@
 from .chipschallenge import ChipsChallenge
 from .clobber import Clobber
+from .flowfree import FlowFree
+from .hashi import Hashi
 from .horses import Horses
 from .klotski import Klotski
+from .lunarlockout import LunarLockout
 from .pancakes import Pancakes
+from .snakestale import Snakestale
+from .sokobaniq import SokobanIQ
+from .sokobanlarge import SokobanLarge
 from .test import Test
 from models import *
 
 game_list = {
     "chipschallenge": ChipsChallenge,
     "clobber": Clobber,
+    "flowfree": FlowFree,
+    "hashi": Hashi,
     "horses": Horses,
     "klotski": Klotski,
+    "lunarlockout": LunarLockout,
     "pancakes": Pancakes,
+    "snakestale": Snakestale,
+    "sokobaniq": SokobanIQ,
+    "sokobanlarge": SokobanLarge,
     "test": Test,
 }
 
