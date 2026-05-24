@@ -381,29 +381,29 @@ class StormySeas(Game):
                 if curr_col != move_col or curr_row != move_row:
                     if curr_row != move_row:
                         direction = "down" if move_row > curr_row else "up"
-                        start = curr_row * self.row_length + curr_col + 42
-                        end = move_row * self.row_length + move_col + 42
+                        start = curr_row * self.row_length + curr_col + 35
+                        end = move_row * self.row_length + move_col + 35
 
                         return f"M_{start}_{end}_x"
 
                     else:
                         direction = "left" if move_col < curr_col else "right"
-                        start = curr_row * self.row_length + curr_col + 42
-                        end = move_row * self.row_length + move_col + 42
+                        start = curr_row * self.row_length + curr_col + 35
+                        end = move_row * self.row_length + move_col + 35
 
                         return f"M_{start}_{end}_x"
 
             # Otherwise a wave row moved
             for row_i, (curr_row, move_row) in enumerate(zip(curr_rows, move_rows)):
                 if curr_row != move_row:
-                    if move_row == curr_row[1:] + "0":
-                        start = row_i * self.row_length + 43
-                        end = row_i * self.row_length + 42
+                    if move_row == curr_row[1:] + "0": # left arrow
+                        start = row_i * self.row_length + 1
+                        end = row_i * self.row_length
 
                         return f"M_{start}_{end}_x"
-                    else:
-                        start = row_i * self.row_length + 47
-                        end = row_i * self.row_length + 48
+                    else: # right arrow
+                        start = row_i * self.row_length + 5
+                        end = row_i * self.row_length + 6
                         return f"M_{start}_{end}_x"
 
             return str(move)
