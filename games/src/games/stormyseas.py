@@ -21,6 +21,7 @@ class StormySeas(Game):
         self.row_length = 0
         self.num_rows = 0
         self.win_condition = ""  # Example win condition
+        self.winState = False
 
         if self._variant_id == "a":
             self.default_rows = ["1011100","1010100","1101100","1011100","1110100"]
@@ -138,6 +139,9 @@ class StormySeas(Game):
         touchable_rows = self.rowsWithBoats()
         overlapping_rows = self.overlappingRows()
 
+        if (string_rep[(self.row_length * self.num_rows):(self.row_length * self.num_rows + 2)] == self.win_condition):
+            positions.append(-1)
+
         # 1. Move any non-boat row left
         for row in range(0, self.num_rows):
             if row not in touchable_rows and row in leftable_rows:
@@ -240,6 +244,11 @@ class StormySeas(Game):
         if isinstance(move, int) and 0 <= move < len(possible_moves):
             return possible_moves[move]
         
+        self.winState = False
+        if (move == -1):
+            self.winState = True
+            return -1
+        
         # Otherwise assume move is already a position hash
         return move
 
@@ -250,7 +259,7 @@ class StormySeas(Game):
         string_rep = self.translate(self.unhash(position))
 
         boats_start = 35
-        if (string_rep[(self.row_length * self.num_rows):(self.row_length * self.num_rows + 2)] == self.win_condition):
+        if (self.winState == True):
                     return Value.Win
         return None
 
@@ -272,10 +281,10 @@ class StormySeas(Game):
             waves = ['W' if char == '1' else '-' for char in waveString]
             boat = []
             #translate the boats; need to be coordinates in fashion of coords
-            red_row = int(boatString[0]);
-            red_col = int(boatString[1]);
-            blue_row = int(boatString[2]);
-            blue_col = int(boatString[3]);
+            red_row = int(boatString[0])
+            red_col = int(boatString[1])
+            blue_row = int(boatString[2])
+            blue_col = int(boatString[3])
 
             for j in range(0, 5):
                 for i in range(0, 7):
