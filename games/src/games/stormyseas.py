@@ -139,9 +139,6 @@ class StormySeas(Game):
         touchable_rows = self.rowsWithBoats()
         overlapping_rows = self.overlappingRows()
 
-        if (string_rep[(self.row_length * self.num_rows):(self.row_length * self.num_rows + 2)] == self.win_condition):
-            positions.append(-1)
-
         # 1. Move any non-boat row left
         for row in range(0, self.num_rows):
             if row not in touchable_rows and row in leftable_rows:
@@ -244,11 +241,6 @@ class StormySeas(Game):
         if isinstance(move, int) and 0 <= move < len(possible_moves):
             return possible_moves[move]
         
-        self.winState = False
-        if (move == -1):
-            self.winState = True
-            return -1
-        
         # Otherwise assume move is already a position hash
         return move
 
@@ -259,8 +251,8 @@ class StormySeas(Game):
         string_rep = self.translate(self.unhash(position))
 
         boats_start = 35
-        if (self.winState == True):
-                    return Value.Win
+        if (string_rep[(self.row_length * self.num_rows):(self.row_length * self.num_rows + 2)] == self.win_condition):
+            return Value.Win
         return None
 
     def CoordinateToPosition(self, x: int, y: int) -> int:
@@ -476,7 +468,23 @@ class StormySeas(Game):
     def unhash(self, intPos: int) -> str:
         boat_count = len(self.colors)
         total_length = self.num_rows + 5 * boat_count  # 5 shifts + 5 ternary digits per boat
-        strPos = self.toTernaryString(intPos).rjust(total_length, "0")
+        # Ensure we have a plain Python int and that it fits in the expected
+        # number of ternary digits. If the value is out-of-range, raise a
+        # clear error instead of allowing `toTernaryString` to allocate an
+        # extremely large list and trigger MemoryError.
+        try:
+            int_val = int(intPos)
+        except Exception:
+            raise ValueError(f"unhash: position must be an integer-like value, got: {type(intPos)}")
+
+        if int_val < 0:
+            raise ValueError(f"unhash: negative positions are invalid: {int_val}")
+
+        max_value = 3 ** total_length - 1
+        if int_val > max_value:
+            raise ValueError(f"unhash: position {int_val} exceeds max representable value {max_value} for total_length {total_length}")
+
+        strPos = self.toTernaryString(int_val).rjust(total_length, "0")
 
         wavePosString = strPos[:self.num_rows]
         boatTernaryString = strPos[self.num_rows:]
