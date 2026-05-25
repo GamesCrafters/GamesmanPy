@@ -4,6 +4,7 @@ from .util import Value, StringMode
 
 
 class Game(ABC):
+    uses_half_moves = False
     @abstractmethod
     def __init__(self, variant_id: str):
         pass
@@ -64,15 +65,8 @@ class Game(ABC):
     def unhash_ext(self, hashed_pos) -> int:
         return hashed_pos
     
-    def generate_single_move(self, position, mode: StringMode = StringMode.Readable):
+    def generate_half_moves(self, position):
         return self.generate_moves(position)
     
-    def resolve_move(self, position, move):
+    def do_half_move(self, position, move):
         return self.do_move(position, move)
-
-    def get_move_value(self, position, move, hash_change_moves):
-        """
-        Given Autogui Move and Position, return if the move is Value.WIN, Value.LOSE, or Value.TIE
-        Is not required by default, only required when multipart moves with same hashes exist (i.e. Chip's Challenge, Sokoban)
-        """
-        return None
