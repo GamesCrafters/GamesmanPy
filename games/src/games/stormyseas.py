@@ -206,27 +206,36 @@ class StormySeas(Game):
             bp = self.boat_pos[boat_i]
             row = int(bp[0])
             col = int(bp[1])
+            boat_other = self.boat_pos[boat_i - 1] # hardcoded for 2 boats
+            row_other = int(boat_other[0])
+            col_other = int(boat_other[1])
 
             # The board is translated (shifted), so col indexes correctly into board_rows
             # Move down: check row+1 exists and is empty
             if row < self.num_rows - 1 and self.board_rows[row + 1][col] == '0':
-                stringToReturn = self.returnRows()
-                for j, other_bp in enumerate(self.boat_pos):
-                    if j == boat_i:
-                        stringToReturn += str(row + 1) + str(col)
-                    else:
-                        stringToReturn += other_bp
-                positions.append(self.hash(self.untranslate(stringToReturn)))
+                if row + 1 == row_other -1 and col == col_other:
+                    pass
+                else:
+                    stringToReturn = self.returnRows()
+                    for j, other_bp in enumerate(self.boat_pos):
+                        if j == boat_i:
+                            stringToReturn += str(row + 1) + str(col)
+                        else:
+                            stringToReturn += other_bp
+                    positions.append(self.hash(self.untranslate(stringToReturn)))
 
             # Move up: top cell is at row-1, new top would be row-2
-            if row > 0 and self.board_rows[row - 2][col] == '0':
-                stringToReturn = self.returnRows()
-                for j, other_bp in enumerate(self.boat_pos):
-                    if j == boat_i:
-                        stringToReturn += str(row - 1) + str(col)
-                    else:
-                        stringToReturn += other_bp
-                positions.append(self.hash(self.untranslate(stringToReturn)))
+            if row > 1 and self.board_rows[row - 2][col] == '0':
+                if row - 1 == row_other + 1 and col == col_other: #check it's not adjacent
+                    pass
+                else:
+                    stringToReturn = self.returnRows()
+                    for j, other_bp in enumerate(self.boat_pos):
+                        if j == boat_i:
+                            stringToReturn += str(row - 1) + str(col)
+                        else:
+                            stringToReturn += other_bp
+                    positions.append(self.hash(self.untranslate(stringToReturn)))
 
         return positions
         
