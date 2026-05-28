@@ -75,7 +75,7 @@ PYRAMID_CHALLENGES: dict[str, dict] = {
         # Challenge 5：「- - x - x H \ y H H」→ Solution「\ y x x x H \ y H H」
         "fixed_slots": (2, 4, 5, 6, 7, 8, 9),
         "init_board": [0, 0, 4, 0, 4, 1, 2, 3, 1, 1],
-        "init_rem": (0, 1, 1, 2),
+        "init_rem": (0, 1, 1, 1),
         "exit_counts": [0, 4, 0, 3, 1],
         "solution_board": [2, 3, 4, 4, 4, 1, 2, 3, 1, 1],
     },
@@ -115,7 +115,7 @@ PYRAMID_CHALLENGES: dict[str, dict] = {
         # Challenge 10：「x x x - \ y - H - H」→ Solution「x x x \ \ y y H H H」
         "fixed_slots": (0, 1, 2, 4, 5, 7, 9),
         "init_board": [4, 4, 4, 0, 2, 3, 0, 1, 0, 1],
-        "init_rem": (2, 1, 1, 0),
+        "init_rem": (1, 1, 1, 0),
         "exit_counts": [1, 2, 2, 2, 1],
         "solution_board": [4, 4, 4, 2, 2, 3, 3, 1, 1, 1],
     },
@@ -139,7 +139,7 @@ PYRAMID_CHALLENGES: dict[str, dict] = {
         # Challenge 13：「- - y - H x \ x - y」→ Solution「\ H y H H x \ x x y」
         "fixed_slots": (2, 4, 5, 6, 7, 9),
         "init_board": [0, 0, 3, 0, 1, 4, 2, 4, 0, 3],
-        "init_rem": (3, 1, 0, 1),
+        "init_rem": (2, 1, 0, 1),
         "exit_counts": [0, 2, 2, 4, 0],
         "solution_board": [2, 1, 3, 1, 1, 4, 2, 4, 4, 3],
     },
@@ -925,8 +925,8 @@ class MarbleCircuit(Game):
             if not confirmed:
                 rows.insert(0, " o  o  o  o  o  o  o  o")
             s = "\n".join(legend + [""] + rows)
-            _pad = "0" * 14
-            board_str = "".join(str(b) for b in board) + "TOYM" + _pad
+            text_slots = "." * 14
+            board_str = "".join(str(b) for b in board) + "TOYM" + text_slots
             goals = list(self._ch_config["exit_counts"])
             if confirmed:
                 ex = self._get_exit_counts_ch23(board)
@@ -934,19 +934,21 @@ class MarbleCircuit(Game):
             else:
                 cur_parts = ["0"] * 5
             goal_parts = [str(g) for g in goals]
-            rem_joined = "".join([str(r) for r in rem] + goal_parts + cur_parts)
             autogui_line = (
                 "1_"
                 + board_str
-                + rem_joined
-                + "_"
-                + "_".join(str(r) for r in rem)
-                + f"_{1 if confirmed else 0}"
+                + "~"
+                + "~".join([str(r) for r in rem] + goal_parts + cur_parts)
             )
             if mode == StringMode.AUTOGUI:
                 return autogui_line
             if mode == StringMode.Readable:
-                return autogui_line
+                return (
+                    "".join(str(b) for b in board)
+                    + "_"
+                    + "_".join(str(r) for r in rem)
+                    + f"_{1 if confirmed else 0}"
+                )
             return s
         board, rem_s, rem_L = self._decode(position)
         lines = [f"[{board[0]}][{board[1]}]  rem: S={rem_s} L={rem_L}", f"[{board[2]}][{board[3]}]"]
@@ -960,6 +962,13 @@ class MarbleCircuit(Game):
         if len(s) >= 2 and s[1] == "_" and s[0] in "012":
             s = s[2:]
         if self._is_pyramid:
+            if "~" in s:
+                entity, *text_parts = s.split("~")
+                head = entity[:10]
+                board = [int(head[i]) for i in range(10)]
+                rem = tuple(int(text_parts[i]) for i in range(4)) if len(text_parts) >= 4 else self._ch_config["init_rem"]
+                confirmed = False
+                return self._encode_ch23(board, rem, confirmed)
             parts = s.split("_")
             if len(parts) >= 5 and len(parts[0]) >= 10:
                 head = parts[0][:10]
