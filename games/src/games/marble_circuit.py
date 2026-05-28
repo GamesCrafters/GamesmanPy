@@ -10,6 +10,9 @@ MAGENTA_4WAY_PATHS = [(TOP_LEFT, BOTTOM_RIGHT), (BOTTOM_RIGHT, TOP_LEFT), (TOP_R
 TOP, RIGHT, BOTTOM, LEFT = 0, 1, 2, 3
 STRAIGHT_PATHS = [(0, 2), (2, 0)]
 L_PATHS = [(0, 1), (1, 0)]
+REM_DIGIT_CHARS = "abdefghijk"
+GOAL_DIGIT_CHARS = "FGHIJKLNPQ"
+RESULT_DIGIT_CHARS = "RUVWXZABCD"
 
 
 def rotate_side(side: int, rotation: int) -> int:
@@ -21,6 +24,12 @@ def rotate_paths(paths: list[tuple[int, int]], rotation: int) -> list[tuple[int,
         rotate_side(a, rotation),
         rotate_side(b, rotation),
     ) for a, b in paths]
+
+
+def encode_hud_digit(value: int, alphabet: str) -> str:
+    if value < 0 or value >= len(alphabet):
+        raise ValueError(f"HUD digit {value} out of range for alphabet")
+    return alphabet[value]
 
 
 PYRAMID_10_TOPOLOGY_CORNERS: list[list[tuple[int, int] | tuple[str, int] | None]] = [
@@ -925,21 +934,16 @@ class MarbleCircuit(Game):
             if not confirmed:
                 rows.insert(0, " o  o  o  o  o  o  o  o")
             s = "\n".join(legend + [""] + rows)
-            text_slots = "." * 14
-            board_str = "".join(str(b) for b in board) + "TOYM" + text_slots
+            rem_chars = "".join(encode_hud_digit(v, REM_DIGIT_CHARS) for v in rem)
             goals = list(self._ch_config["exit_counts"])
             if confirmed:
                 ex = self._get_exit_counts_ch23(board)
-                cur_parts = [str(e) for e in ex]
+                result_chars = "".join(encode_hud_digit(e, RESULT_DIGIT_CHARS) for e in ex)
             else:
-                cur_parts = ["0"] * 5
-            goal_parts = [str(g) for g in goals]
-            autogui_line = (
-                "1_"
-                + board_str
-                + "~"
-                + "~".join([str(r) for r in rem] + goal_parts + cur_parts)
-            )
+                result_chars = RESULT_DIGIT_CHARS[0] * 5
+            goal_chars = "".join(encode_hud_digit(g, GOAL_DIGIT_CHARS) for g in goals)
+            board_str = "".join(str(b) for b in board) + "TOYM" + rem_chars + goal_chars + result_chars
+            autogui_line = "1_" + board_str
             if mode == StringMode.AUTOGUI:
                 return autogui_line
             if mode == StringMode.Readable:
@@ -962,14 +966,14 @@ class MarbleCircuit(Game):
         if len(s) >= 2 and s[1] == "_" and s[0] in "012":
             s = s[2:]
         if self._is_pyramid:
-            if "~" in s:
-                entity, *text_parts = s.split("~")
+            parts = s.split("_")
+            if len(parts) >= 1 and len(parts[0]) >= 28 and parts[0][10:14] == "TOYM":
+                entity = parts[0]
                 head = entity[:10]
                 board = [int(head[i]) for i in range(10)]
-                rem = tuple(int(text_parts[i]) for i in range(4)) if len(text_parts) >= 4 else self._ch_config["init_rem"]
+                rem = tuple(REM_DIGIT_CHARS.index(entity[14 + i]) for i in range(4))
                 confirmed = False
                 return self._encode_ch23(board, rem, confirmed)
-            parts = s.split("_")
             if len(parts) >= 5 and len(parts[0]) >= 10:
                 head = parts[0][:10]
                 board = [int(head[i]) for i in range(10)]
