@@ -5,6 +5,7 @@ from .hashi import Hashi
 from .horses import Horses
 from .klotski import Klotski
 from .lunarlockout import LunarLockout
+from .marble_circuit import MarbleCircuit
 from .pancakes import Pancakes
 from .snakestale import Snakestale
 from .sokobaniq import SokobanIQ
@@ -17,9 +18,10 @@ game_list = {
     "clobber": Clobber,
     "flowfree": FlowFree,
     "hashi": Hashi,
-    "horses": Horses,
+    "horses": Horses,    
     "klotski": Klotski,
     "lunarlockout": LunarLockout,
+    "marble_circuit": MarbleCircuit,
     "pancakes": Pancakes,
     "snakestale": Snakestale,
     "sokobaniq": SokobanIQ,
@@ -38,4 +40,3 @@ def get_game(game_id: str, variant_id: str=None) -> Result[Game, str]:
     if variant_id is not None and variant_id not in game.variants:
         return Err("Invalid variant ID")
     return Ok(game)
-    
