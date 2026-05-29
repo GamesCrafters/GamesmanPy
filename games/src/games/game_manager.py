@@ -10,6 +10,7 @@ from .pancakes import Pancakes
 from .snakestale import Snakestale
 from .sokobaniq import SokobanIQ
 from .sokobanlarge import SokobanLarge
+from .stormyseas import StormySeas
 from .test import Test
 from models import *
 
@@ -26,6 +27,7 @@ game_list = {
     "snakestale": Snakestale,
     "sokobaniq": SokobanIQ,
     "sokobanlarge": SokobanLarge,
+    "stormyseas": StormySeas,
     "test": Test,
 }
 
