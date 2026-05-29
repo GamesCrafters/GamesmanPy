@@ -10,6 +10,9 @@ MAGENTA_4WAY_PATHS = [(TOP_LEFT, BOTTOM_RIGHT), (BOTTOM_RIGHT, TOP_LEFT), (TOP_R
 TOP, RIGHT, BOTTOM, LEFT = 0, 1, 2, 3
 STRAIGHT_PATHS = [(0, 2), (2, 0)]
 L_PATHS = [(0, 1), (1, 0)]
+REM_DIGIT_CHARS = "abdefghijk"
+GOAL_DIGIT_CHARS = "FGHIJKLNPQ"
+RESULT_DIGIT_CHARS = "RUVWXZABCD"
 
 
 def rotate_side(side: int, rotation: int) -> int:
@@ -21,6 +24,12 @@ def rotate_paths(paths: list[tuple[int, int]], rotation: int) -> list[tuple[int,
         rotate_side(a, rotation),
         rotate_side(b, rotation),
     ) for a, b in paths]
+
+
+def encode_hud_digit(value: int, alphabet: str) -> str:
+    if value < 0 or value >= len(alphabet):
+        raise ValueError(f"HUD digit {value} out of range for alphabet")
+    return alphabet[value]
 
 
 PYRAMID_10_TOPOLOGY_CORNERS: list[list[tuple[int, int] | tuple[str, int] | None]] = [
@@ -75,7 +84,7 @@ PYRAMID_CHALLENGES: dict[str, dict] = {
         # Challenge 5：「- - x - x H \ y H H」→ Solution「\ y x x x H \ y H H」
         "fixed_slots": (2, 4, 5, 6, 7, 8, 9),
         "init_board": [0, 0, 4, 0, 4, 1, 2, 3, 1, 1],
-        "init_rem": (0, 1, 1, 2),
+        "init_rem": (0, 1, 1, 1),
         "exit_counts": [0, 4, 0, 3, 1],
         "solution_board": [2, 3, 4, 4, 4, 1, 2, 3, 1, 1],
     },
@@ -115,7 +124,7 @@ PYRAMID_CHALLENGES: dict[str, dict] = {
         # Challenge 10：「x x x - \ y - H - H」→ Solution「x x x \ \ y y H H H」
         "fixed_slots": (0, 1, 2, 4, 5, 7, 9),
         "init_board": [4, 4, 4, 0, 2, 3, 0, 1, 0, 1],
-        "init_rem": (2, 1, 1, 0),
+        "init_rem": (1, 1, 1, 0),
         "exit_counts": [1, 2, 2, 2, 1],
         "solution_board": [4, 4, 4, 2, 2, 3, 3, 1, 1, 1],
     },
@@ -139,7 +148,7 @@ PYRAMID_CHALLENGES: dict[str, dict] = {
         # Challenge 13：「- - y - H x \ x - y」→ Solution「\ H y H H x \ x x y」
         "fixed_slots": (2, 4, 5, 6, 7, 9),
         "init_board": [0, 0, 3, 0, 1, 4, 2, 4, 0, 3],
-        "init_rem": (3, 1, 0, 1),
+        "init_rem": (2, 1, 0, 1),
         "exit_counts": [0, 2, 2, 4, 0],
         "solution_board": [2, 1, 3, 1, 1, 4, 2, 4, 4, 3],
     },
@@ -925,28 +934,25 @@ class MarbleCircuit(Game):
             if not confirmed:
                 rows.insert(0, " o  o  o  o  o  o  o  o")
             s = "\n".join(legend + [""] + rows)
-            _pad = "0" * 14
-            board_str = "".join(str(b) for b in board) + "TOYM" + _pad
+            rem_chars = "".join(encode_hud_digit(v, REM_DIGIT_CHARS) for v in rem)
             goals = list(self._ch_config["exit_counts"])
             if confirmed:
                 ex = self._get_exit_counts_ch23(board)
-                cur_parts = [str(e) for e in ex]
+                result_chars = "".join(encode_hud_digit(e, RESULT_DIGIT_CHARS) for e in ex)
             else:
-                cur_parts = ["0"] * 5
-            goal_parts = [str(g) for g in goals]
-            rem_joined = "".join([str(r) for r in rem] + goal_parts + cur_parts)
-            autogui_line = (
-                "1_"
-                + board_str
-                + rem_joined
-                + "_"
-                + "_".join(str(r) for r in rem)
-                + f"_{1 if confirmed else 0}"
-            )
+                result_chars = RESULT_DIGIT_CHARS[0] * 5
+            goal_chars = "".join(encode_hud_digit(g, GOAL_DIGIT_CHARS) for g in goals)
+            board_str = "".join(str(b) for b in board) + "TOYM" + rem_chars + goal_chars + result_chars
+            autogui_line = "1_" + board_str
             if mode == StringMode.AUTOGUI:
                 return autogui_line
             if mode == StringMode.Readable:
-                return autogui_line
+                return (
+                    "".join(str(b) for b in board)
+                    + "_"
+                    + "_".join(str(r) for r in rem)
+                    + f"_{1 if confirmed else 0}"
+                )
             return s
         board, rem_s, rem_L = self._decode(position)
         lines = [f"[{board[0]}][{board[1]}]  rem: S={rem_s} L={rem_L}", f"[{board[2]}][{board[3]}]"]
@@ -961,6 +967,13 @@ class MarbleCircuit(Game):
             s = s[2:]
         if self._is_pyramid:
             parts = s.split("_")
+            if len(parts) >= 1 and len(parts[0]) >= 28 and parts[0][10:14] == "TOYM":
+                entity = parts[0]
+                head = entity[:10]
+                board = [int(head[i]) for i in range(10)]
+                rem = tuple(REM_DIGIT_CHARS.index(entity[14 + i]) for i in range(4))
+                confirmed = False
+                return self._encode_ch23(board, rem, confirmed)
             if len(parts) >= 5 and len(parts[0]) >= 10:
                 head = parts[0][:10]
                 board = [int(head[i]) for i in range(10)]
