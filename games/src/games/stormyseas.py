@@ -46,7 +46,7 @@ class StormySeas(Game):
             for x in boat_pos:
                 curr_shift_string += x
 
-            hash = self.hash(curr_shift_string) #need to change/account for
+            hash = self.hash(curr_shift_string + '7') #we're using '7' as our placeholder indicator value
             return hash
 
         return 0
@@ -127,10 +127,12 @@ class StormySeas(Game):
     
 
     def generate_moves(self, position: int):
+        # update w/last commit, to make sure arrows are in every row as intended: attach 'indicator' at end of string that is the index of each row that can be moved, or '8' if attributed to red boat, or '9' if attributed to blue boat, if a boat is just being moved it doesn't matter, put '7' as a placeholder
         string_rep = self.translate(self.unhash(position))
         self.board_rows = [string_rep[i:i+7] for i in range(0, 35, 7)]
         # Also update boat_pos from the position
-        boat_str = string_rep[35:]
+        boat_str = string_rep[35:39]
+
         self.boat_pos = [boat_str[i:i+2] for i in range(0, len(boat_str), 2)]
 
         positions = []
@@ -145,6 +147,8 @@ class StormySeas(Game):
                 stringToReturn = self.moveRowsLeft([row])
                 for bp in self.boat_pos:
                     stringToReturn += bp
+                #append special indicator of index of row being moved; redundant but for consistency
+                stringToReturn += str(row)
                 positions.append(self.hash(self.untranslate(stringToReturn)))
 
         # 2. Move any non-boat row right
@@ -153,9 +157,13 @@ class StormySeas(Game):
                 stringToReturn = self.moveRowsRight([row])
                 for bp in self.boat_pos:
                     stringToReturn += bp
+                #append special indicator of index of row being moved; redundant but for consistency
+                stringToReturn += str(row)
                 positions.append(self.hash(self.untranslate(stringToReturn)))
 
         # 3. Move any boat left (rows move left, boat col decreases)
+
+        # this section will append positions assuming the two boats happen to overlap (so three rows are moved)
         if overlapping_rows:
             if all(row in leftable_rows for row in overlapping_rows):
                 stringToReturn = self.moveRowsLeft(overlapping_rows)
@@ -164,7 +172,14 @@ class StormySeas(Game):
                     if col < 0:
                         col = self.row_length - 1
                     stringToReturn += bp[0] + str(col)
-                positions.append(self.hash(self.untranslate(stringToReturn)))
+                # append special indicator of index of all rows being touched
+                for row in overlapping_rows:
+                    positions.append(self.hash(self.untranslate(stringToReturn + str(row))))
+                # append special indicator for both boats; '8' = red, '9' = blue
+                positions.append(self.hash(self.untranslate(stringToReturn + '8')))
+                positions.append(self.hash(self.untranslate(stringToReturn + '9')))
+        
+        # this section assumes boats are not overlapping (so two rows are being moved)
         else:
             for boat_i in range(len(self.boat_pos)):
                 bp = self.boat_pos[boat_i]
@@ -176,7 +191,13 @@ class StormySeas(Game):
                             stringToReturn += other_bp[0] + str(int(other_bp[1]) - 1)
                         else:
                             stringToReturn += other_bp
-                    positions.append(self.hash(self.untranslate(stringToReturn)))
+                    #append special indicator for both rows being touched
+                    for row in rows:
+                        positions.append(self.hash(self.untranslate(stringToReturn + str(row))))
+
+                    #append special indicator for the boat being touched
+                    boat_touched = '8' if boat_i == 0 else '9'
+                    positions.append(self.hash(self.untranslate(stringToReturn + boat_touched)))
 
         # 4. Move any boat right (rows move right, boat col increases)
         if overlapping_rows:
@@ -187,7 +208,13 @@ class StormySeas(Game):
                     if col > self.row_length - 1:
                         col = 0
                     stringToReturn += bp[0] + str(col)
-                positions.append(self.hash(self.untranslate(stringToReturn)))
+
+                # append special indicator of index of all rows being touched
+                for row in overlapping_rows:
+                    positions.append(self.hash(self.untranslate(stringToReturn + str(row))))
+                # append special indicator for both boats; '8' = red, '9' = blue
+                positions.append(self.hash(self.untranslate(stringToReturn + '8')))
+                positions.append(self.hash(self.untranslate(stringToReturn + '9')))
         else:
             for boat_i in range(len(self.boat_pos)):
                 bp = self.boat_pos[boat_i]
@@ -199,7 +226,13 @@ class StormySeas(Game):
                             stringToReturn += other_bp[0] + str(int(other_bp[1]) + 1)
                         else:
                             stringToReturn += other_bp
-                    positions.append(self.hash(self.untranslate(stringToReturn)))
+                    #append special indicator for both rows being touched
+                    for row in rows:
+                        positions.append(self.hash(self.untranslate(stringToReturn + str(row))))
+
+                    #append special indicator for the boat being touched
+                    boat_touched = '8' if boat_i == 0 else '9'
+                    positions.append(self.hash(self.untranslate(stringToReturn + boat_touched)))
 
         # 5. Slide any boat up or down
         for boat_i in range(len(self.boat_pos)):
@@ -222,7 +255,7 @@ class StormySeas(Game):
                             stringToReturn += str(row + 1) + str(col)
                         else:
                             stringToReturn += other_bp
-                    positions.append(self.hash(self.untranslate(stringToReturn)))
+                    positions.append(self.hash(self.untranslate(stringToReturn + '7')))
 
             # Move up: top cell is at row-1, new top would be row-2
             if row > 1 and self.board_rows[row - 2][col] == '0':
@@ -235,7 +268,7 @@ class StormySeas(Game):
                             stringToReturn += str(row - 1) + str(col)
                         else:
                             stringToReturn += other_bp
-                    positions.append(self.hash(self.untranslate(stringToReturn)))
+                    positions.append(self.hash(self.untranslate(stringToReturn + '7')))
 
         return positions
         
@@ -273,7 +306,8 @@ class StormySeas(Game):
         """
         string_rep = self.translate(self.unhash(position))
         waveString = string_rep[:self.row_length * self.num_rows]
-        boatString = string_rep[self.row_length * self.num_rows:]
+        boatString = string_rep[self.row_length * self.num_rows:self.row_length * self.num_rows + 4]
+        indicator = string_rep[self.row_length * self.num_rows + 4:]
 
         # pretend that the center of each tile is a wave or not
         if mode == StringMode.AUTOGUI:
@@ -304,7 +338,7 @@ class StormySeas(Game):
             for string in boat:
                 stringBoat += string
 
-            return "1_" + stringWave + stringBoat
+            return "1_" + stringWave + stringBoat + indicator
 
         
         else:
@@ -331,7 +365,7 @@ class StormySeas(Game):
                 i += 2
 
             string_view = ''.join(string_view)
-            return string_view
+            return string_view + indicator
 
     def from_string(self, strposition: str) -> int:
         """
@@ -344,6 +378,7 @@ class StormySeas(Game):
 
         rows = [strposition[i:i+self.row_length] for i in range(0, expected_length, self.row_length)]
         binary_str = ""
+        indicator = strposition[expected_length:]
         boat_positions = {}  # color -> (row, col) of bottom cell
 
         for row_idx, row in enumerate(rows):
@@ -368,7 +403,7 @@ class StormySeas(Game):
 
         # Combine binary board + boat positions, then untranslate and hash
         full_string = binary_str + "".join(boat_pos_list)
-        return self.hash(self.untranslate(full_string))
+        return self.hash(self.untranslate(full_string + indicator))
     
     
     def move_to_string(self, move: int, mode: StringMode) -> str:
@@ -376,17 +411,20 @@ class StormySeas(Game):
 
             move_rep = self.translate(self.unhash(move))
             move_rows = [move_rep[i:i+self.row_length] for i in range(0, self.row_length * self.num_rows, self.row_length)]
-            move_boat_str = move_rep[self.row_length * self.num_rows:]
+            move_boat_str = move_rep[self.row_length * self.num_rows:self.row_length * self.num_rows + 4]
             move_boats = [move_boat_str[i:i+2] for i in range(0, len(move_boat_str), 2)]
+            move_indicator = int(move_rep[self.row_length * self.num_rows + 4:])
 
             curr_rows = self.board_rows
             curr_boats = self.boat_pos
 
-            # Check if any boat moved
-            for boat_i, (curr_bp, move_bp) in enumerate(zip(curr_boats, move_boats)):
+            # Check if any red boat moved
+            if move_indicator == 8 or move_indicator == 7:
+                curr_bp = curr_boats[0]
+                move_bp = move_boats[0]
                 curr_row, curr_col = int(curr_bp[0]), int(curr_bp[1])
                 move_row, move_col = int(move_bp[0]), int(move_bp[1])
-                color = self.colors[boat_i].lower()
+                color = self.colors[0].lower()
 
                 if curr_col != move_col or curr_row != move_row:
                     if curr_row != move_row:
@@ -403,17 +441,40 @@ class StormySeas(Game):
 
                         return f"M_{start}_{end}_x"
 
+            #check if any blue boat moved
+            if move_indicator == 9 or move_indicator == 7:
+                curr_bp = curr_boats[1]
+                move_bp = move_boats[1]
+                curr_row, curr_col = int(curr_bp[0]), int(curr_bp[1])
+                move_row, move_col = int(move_bp[0]), int(move_bp[1])
+                color = self.colors[1].lower()
+
+                if curr_col != move_col or curr_row != move_row:
+                    if curr_row != move_row:
+                        direction = "down" if move_row > curr_row else "up"
+                        start = curr_row * self.row_length + curr_col + 35
+                        end = move_row * self.row_length + move_col + 35
+
+                        return f"M_{start}_{end}_x"
+
+                    else:
+                        direction = "left" if move_col < curr_col else "right"
+                        start = curr_row * self.row_length + curr_col + 35
+                        end = move_row * self.row_length + move_col + 35
+
+                        return f"M_{start}_{end}_x"     
+
             # Otherwise a wave row moved
             for row_i, (curr_row, move_row) in enumerate(zip(curr_rows, move_rows)):
                 if curr_row != move_row:
                     if move_row == curr_row[1:] + "0": # left arrow
-                        start = row_i * self.row_length + 1
-                        end = row_i * self.row_length
+                        start = move_indicator * self.row_length + 1
+                        end = move_indicator * self.row_length
 
                         return f"M_{start}_{end}_x"
                     else: # right arrow
-                        start = row_i * self.row_length + 5
-                        end = row_i * self.row_length + 6
+                        start = move_indicator * self.row_length + 5
+                        end = move_indicator * self.row_length + 6
                         return f"M_{start}_{end}_x"
 
             return str(move)
@@ -424,6 +485,7 @@ class StormySeas(Game):
         move_rows = [move_rep[i:i+self.row_length] for i in range(0, self.row_length * self.num_rows, self.row_length)]
         move_boat_str = move_rep[self.row_length * self.num_rows:]
         move_boats = [move_boat_str[i:i+2] for i in range(0, len(move_boat_str), 2)]
+        move_indicator = int(move_rep[self.row_length * self.num_rows + 4:])
 
         curr_rows = self.board_rows
         curr_boats = self.boat_pos
@@ -442,14 +504,14 @@ class StormySeas(Game):
                 else:
                     direction = "left" if move_col < curr_col else "right"
                     return f"boat{color}-{direction}"
-
+                
         # Otherwise a wave row moved
         for row_i, (curr_row, move_row) in enumerate(zip(curr_rows, move_rows)):
             if curr_row != move_row:
                 if move_row == curr_row[1:] + "0":
-                    return f"row{row_i}-left"
+                    return f"row{move_indicator}-left"
                 else:
-                    return f"row{row_i}-right"
+                    return f"row{move_indicator}-right"
 
         return str(move)  # fallback
 
@@ -463,47 +525,39 @@ class StormySeas(Game):
         # put string back together, then the final string convert into an integer via int(x, 3)
 
         wavePosString = strPos[:self.num_rows]
-        boatString = strPos[self.num_rows:]
+        boatString = strPos[self.num_rows:self.num_rows+ 4]
+        indicatorString = strPos[self.num_rows + 4:]
         boatTernaryString = ""
+        indicatorTernaryString = self.indicatorTernary(indicatorString)
 
         for i in range(0, len(boatString), 2):
            boat = boatString[i:i+2]
            boatTernaryString += self.boatTernary(boat)
 
-        result = wavePosString + boatTernaryString
+        result = wavePosString + boatTernaryString + indicatorTernaryString
 
         return int(result, 3)
 
     def unhash(self, intPos: int) -> str:
         boat_count = len(self.colors)
-        total_length = self.num_rows + 5 * boat_count  # 5 shifts + 5 ternary digits per boat
-        # Ensure we have a plain Python int and that it fits in the expected
-        # number of ternary digits. If the value is out-of-range, raise a
-        # clear error instead of allowing `toTernaryString` to allocate an
-        # extremely large list and trigger MemoryError.
-        try:
-            int_val = int(intPos)
-        except Exception:
-            raise ValueError(f"unhash: position must be an integer-like value, got: {type(intPos)}")
+        total_length = self.num_rows + 5 * boat_count + 3 # 5 shifts + 5 ternary digits per boat + 3 for indicator
 
-        if int_val < 0:
-            raise ValueError(f"unhash: negative positions are invalid: {int_val}")
-
-        max_value = 3 ** total_length - 1
-        if int_val > max_value:
-            raise ValueError(f"unhash: position {int_val} exceeds max representable value {max_value} for total_length {total_length}")
+        int_val = int(intPos)
 
         strPos = self.toTernaryString(int_val).rjust(total_length, "0")
 
         wavePosString = strPos[:self.num_rows]
-        boatTernaryString = strPos[self.num_rows:]
+        boatTernaryString = strPos[self.num_rows:self.num_rows + 5 * boat_count]
+        indicatorTernaryString = strPos[self.num_rows + 5 * boat_count:]
+
         boatString = ""
+        indicatorString = self.indicatorTernaryReverse(indicatorTernaryString)
 
         while boatTernaryString != "":
             boatString += self.boatTernaryReverse(boatTernaryString[:5])
             boatTernaryString = boatTernaryString[5:]
 
-        return wavePosString + boatString
+        return wavePosString + boatString + indicatorString
 
     def boatTernary(self, boatString: str) -> str:
         # Convert 2-digit decimal boat position to fixed 5-digit ternary
@@ -514,6 +568,16 @@ class StormySeas(Game):
     def boatTernaryReverse(self, boatTernaryStr: str) -> str:
         # Convert 5-digit ternary back to 2-digit decimal string, zero-padded
         return str(int(boatTernaryStr, 3)).rjust(2, "0")
+    
+    def indicatorTernary(self, indicator):
+        # max is 1-9 integers used
+        print(indicator)
+        indicatorTern = self.toTernaryString(int(indicator)).rjust(3, "0")
+        return indicatorTern  
+    
+    def indicatorTernaryReverse(self, boatTernaryStr: str) -> str:
+        # Convert 3-digit ternary back to 1-digit decimal string, zero-padded
+        return str(int(boatTernaryStr, 3)).rjust(1, "0")
 
 
     def toTernaryString(self, n):
@@ -550,7 +614,8 @@ class StormySeas(Game):
 
 
         board_part = str[:(self.num_rows * self.row_length)]
-        boat_part = str[self.num_rows * self.row_length:]
+        boat_part = str[self.num_rows * self.row_length:self.num_rows * self.row_length + 4]
+        indicator = str[self.num_rows * self.row_length + 4:]
 
         shifts = ""
         for row_idx in range(self.num_rows):
@@ -564,5 +629,5 @@ class StormySeas(Game):
             elif row == "00" + expected_row[:self.row_length - 2]:
                 shifts += "2"
 
-
-        return shifts + boat_part
+        print (shifts + boat_part + indicator)
+        return shifts + boat_part + indicator
