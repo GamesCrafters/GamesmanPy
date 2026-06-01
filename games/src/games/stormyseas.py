@@ -491,22 +491,40 @@ class StormySeas(Game):
         curr_boats = self.boat_pos
 
         # Check if any boat moved
-        for boat_i, (curr_bp, move_bp) in enumerate(zip(curr_boats, move_boats)):
+
+        # red boat moved
+        if move_indicator == 8 or move_indicator == 7:
+            curr_bp = curr_boats[0]
+            move_bp = move_boats[0]
             curr_row, curr_col = int(curr_bp[0]), int(curr_bp[1])
             move_row, move_col = int(move_bp[0]), int(move_bp[1])
-            color = self.colors[boat_i].lower()
 
             if curr_col != move_col or curr_row != move_row:
                 if curr_row != move_row:
                     direction = "down" if move_row > curr_row else "up"
-
-                    return f"boat{color}-{direction}"
+                    return f"boatr-{direction}"
                 else:
                     direction = "left" if move_col < curr_col else "right"
-                    return f"boat{color}-{direction}"
+                    return f"boatr-{direction}"
                 
+            #blue boat moved
+            #check if any blue boat moved
+
+        if move_indicator == 9 or move_indicator == 7:
+            curr_bp = curr_boats[1]
+            move_bp = move_boats[1]
+            curr_row, curr_col = int(curr_bp[0]), int(curr_bp[1])
+            move_row, move_col = int(move_bp[0]), int(move_bp[1])
+            if curr_col != move_col or curr_row != move_row:
+                if curr_row != move_row:
+                    direction = "down" if move_row > curr_row else "up"
+                    return f"boatb-{direction}"
+                else:
+                    direction = "left" if move_col < curr_col else "right"
+                    return f"boatb-{direction}"
+                    
         # Otherwise a wave row moved
-        for row_i, (curr_row, move_row) in enumerate(zip(curr_rows, move_rows)):
+        for row_i, (curr_row, move_row) in enumerate(zip(curr_rows, move_rows)):            
             if curr_row != move_row:
                 if move_row == curr_row[1:] + "0":
                     return f"row{move_indicator}-left"
