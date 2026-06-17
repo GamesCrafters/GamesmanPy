@@ -3,7 +3,7 @@ from typing import Optional
 
 class StormySeas(Game):
     id = 'stormyseas'
-    variants = ["a"]
+    variants = ["Beginner 1", "Beginner 2", "Beginner 3", "Intermediate 1", "Intermediate 2"]
     n_players = 1
     cyclic = False
     colors = ["R", "B"]
@@ -23,14 +23,45 @@ class StormySeas(Game):
         self.win_condition = ""  # Example win condition
         self.winState = False
 
-        if self._variant_id == "a":
+        # a/row1 = 1011100
+        # b/row2 = 1010100
+        # c/row3 = 1101100
+        # d/row4 = 1011100
+        # e/row5 = 1110100
+
+        if self._variant_id == "Beginner 1":
             self.default_rows = ["1011100","1010100","1101100","1011100","1110100"]
             self.row_length = len(self.default_rows[0])
             self.num_rows = len(self.default_rows)
             self.win_condition = "43"
 
+        if self._variant_id == "Beginner 2":
+            self.default_rows = ["1011100","1011100","1010100","1101100","1110100"]
+            self.row_length = len(self.default_rows[0])
+            self.num_rows = len(self.default_rows)
+            self.win_condition = "43"
+
+        if self._variant_id == "Beginner 3":
+            self.default_rows = ["1011100","1011100","1110100","1010100","1101100"]
+            self.row_length = len(self.default_rows[0])
+            self.num_rows = len(self.default_rows)
+            self.win_condition = "43"
+
+        if self._variant_id == "Intermediate 1":
+            self.default_rows = ["1011100","1011100","1101100","1010100","1110100"]
+            self.row_length = len(self.default_rows[0])
+            self.num_rows = len(self.default_rows)
+            self.win_condition = "43"
+
+        if self._variant_id == "Intermediate 2":
+            self.default_rows = ["1110100","1010100","1101100","1011100","1011100"]
+            self.row_length = len(self.default_rows[0])
+            self.num_rows = len(self.default_rows)
+            self.win_condition = "43"
+
+
     def start(self) -> int:
-        if self._variant_id == "a":
+        if self._variant_id == "Beginner 1":
             self.board_rows = ["0101110","0101010","0011011","0101110","0111010"]
 
             # use ternary digits to represent shifts?
@@ -48,7 +79,79 @@ class StormySeas(Game):
 
             hash = self.hash(curr_shift_string + '7') #we're using '7' as our placeholder indicator value
             return hash
+        
+        if self._variant_id == "Beginner 2":
+            self.board_rows = ["0010111","0101110","0010101","0110110","0111010"]
 
+            curr_shift_string = "21211"
+            boat_pos = ["33", "40"] 
+            self.boat_pos = boat_pos
+            
+            self.row_length = len(self.board_rows[0])
+            self.num_rows = len(self.board_rows)
+            self.win_condition = "43"
+
+            for x in boat_pos:
+                curr_shift_string += x
+
+            hash = self.hash(curr_shift_string + '7') 
+            return hash
+
+        if self._variant_id == "Beginner 3":
+            self.board_rows = ["0101110","0101110","0111010","1010100","0011011"]
+
+            curr_shift_string = "11102"
+            boat_pos = ["12", "26"] 
+            self.boat_pos = boat_pos
+            
+            self.row_length = len(self.board_rows[0])
+            self.num_rows = len(self.board_rows)
+            self.win_condition = "43"
+
+
+            for x in boat_pos:
+                curr_shift_string += x
+
+            hash = self.hash(curr_shift_string + '7') 
+            return hash
+
+        
+        if self._variant_id == "Intermediate 1":
+            self.board_rows = ["0010111","00101110","1101100","1010100","1110100"]
+
+            curr_shift_string = "22000"
+            boat_pos = ["13", "43"] 
+            self.boat_pos = boat_pos
+            
+            self.row_length = len(self.board_rows[0])
+            self.num_rows = len(self.board_rows)
+            self.win_condition = "43"
+
+
+            for x in boat_pos:
+                curr_shift_string += x
+
+            hash = self.hash(curr_shift_string + '7') 
+            return hash
+
+        if self._variant_id == "Intermediate 2":
+            self.board_rows = ["0111010","0101010","1101100","0101110","0101110"]
+
+            curr_shift_string = "11011"
+            boat_pos = ["14", "32"] 
+            self.boat_pos = boat_pos
+            
+            self.row_length = len(self.board_rows[0])
+            self.num_rows = len(self.board_rows)
+            self.win_condition = "43"
+
+
+            for x in boat_pos:
+                curr_shift_string += x
+
+            hash = self.hash(curr_shift_string + '7') 
+            return hash
+        
         return 0
 
     def rowsWithBoats(self):
@@ -403,6 +506,8 @@ class StormySeas(Game):
 
         # Combine binary board + boat positions, then untranslate and hash
         full_string = binary_str + "".join(boat_pos_list)
+
+        # print(full_string + indicator)
         return self.hash(self.untranslate(full_string + indicator))
     
     
@@ -589,7 +694,7 @@ class StormySeas(Game):
     
     def indicatorTernary(self, indicator):
         # max is 1-9 integers used
-        # print(indicator)
+        # print(indicator + "blahhhhh")
         indicatorTern = self.toTernaryString(int(indicator)).rjust(3, "0")
         return indicatorTern  
     
