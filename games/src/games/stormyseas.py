@@ -6,7 +6,7 @@ class StormySeas(Game):
     variants = ["Beginner 1", "Beginner 2", "Intermediate 1", "Intermediate 2"]
     n_players = 1
     cyclic = False
-    colors = ["R", "B"]
+    colors = ["R", "P"]
 
     def __init__(self, variant_id: str):
         """
@@ -405,7 +405,7 @@ class StormySeas(Game):
                     if j == red_row and i == red_col:
                         boat += ['R']
                     elif j == blue_row and i == blue_col:
-                        boat += ['B']
+                        boat += ['P']
                     else:
                         boat += ['-']
 
