@@ -3,7 +3,7 @@ from typing import Optional
 
 class StormySeas(Game):
     id = 'stormyseas'
-    variants = ["Beginner 1", "Beginner 2", "Beginner 3", "Intermediate 1", "Intermediate 2"]
+    variants = ["Beginner 1", "Beginner 2", "Intermediate 1", "Intermediate 2"]
     n_players = 1
     cyclic = False
     colors = ["R", "B"]
@@ -30,18 +30,12 @@ class StormySeas(Game):
         # e/row5 = 1110100
 
         if self._variant_id == "Beginner 1":
-            self.default_rows = ["1011100","1010100","1101100","1011100","1110100"]
-            self.row_length = len(self.default_rows[0])
-            self.num_rows = len(self.default_rows)
-            self.win_condition = "43"
-
-        if self._variant_id == "Beginner 2":
             self.default_rows = ["1011100","1011100","1010100","1101100","1110100"]
             self.row_length = len(self.default_rows[0])
             self.num_rows = len(self.default_rows)
             self.win_condition = "43"
 
-        if self._variant_id == "Beginner 3":
+        if self._variant_id == "Beginner 2":
             self.default_rows = ["1011100","1011100","1110100","1010100","1101100"]
             self.row_length = len(self.default_rows[0])
             self.num_rows = len(self.default_rows)
@@ -61,26 +55,8 @@ class StormySeas(Game):
 
 
     def start(self) -> int:
-        if self._variant_id == "Beginner 1":
-            self.board_rows = ["0101110","0101010","0011011","0101110","0111010"]
-
-            # use ternary digits to represent shifts?
-            curr_shift_string = "11211"
-            boat_pos = ["24", "12"] # first two digits is position in x-y where 0, 0 is top left square on board (always facing DOWN and always length 2)
-            self.boat_pos = boat_pos
-            
-            self.row_length = len(self.board_rows[0])
-            self.num_rows = len(self.board_rows)
-            self.win_condition = "43"
-
-
-            for x in boat_pos:
-                curr_shift_string += x
-
-            hash = self.hash(curr_shift_string + '7') #we're using '7' as our placeholder indicator value
-            return hash
         
-        if self._variant_id == "Beginner 2":
+        if self._variant_id == "Beginner 1":
             self.board_rows = ["0010111","0101110","0010101","0110110","0111010"]
 
             curr_shift_string = "21211"
@@ -97,7 +73,7 @@ class StormySeas(Game):
             hash = self.hash(curr_shift_string + '7') 
             return hash
 
-        if self._variant_id == "Beginner 3":
+        if self._variant_id == "Beginner 2":
             self.board_rows = ["0101110","0101110","0111010","1010100","0011011"]
 
             curr_shift_string = "11102"
@@ -268,12 +244,11 @@ class StormySeas(Game):
 
         # this section will append positions assuming the two boats happen to overlap (so three rows are moved)
         if overlapping_rows:
-            if all(row in leftable_rows for row in overlapping_rows):
+            # check its not occupying leftmost col
+            if self.boat_pos[0][1] != "0" and self.boat_pos[1][1] != "0" and all(row in leftable_rows for row in overlapping_rows):
                 stringToReturn = self.moveRowsLeft(overlapping_rows)
                 for bp in self.boat_pos:
                     col = int(bp[1]) - 1
-                    if col < 0:
-                        col = self.row_length - 1
                     stringToReturn += bp[0] + str(col)
                 # append special indicator of index of all rows being touched
                 for row in overlapping_rows:
@@ -304,12 +279,13 @@ class StormySeas(Game):
 
         # 4. Move any boat right (rows move right, boat col increases)
         if overlapping_rows:
-            if all(row in rightable_rows for row in overlapping_rows):
+
+            # check that boats are not occupying rightmost col
+            if self.boat_pos[0][1] != str(self.row_length - 1) and self.boat_pos[1][1] != str(self.row_length - 1) and all(row in rightable_rows for row in overlapping_rows):
+
                 stringToReturn = self.moveRowsRight(overlapping_rows)
                 for bp in self.boat_pos:
                     col = int(bp[1]) + 1
-                    if col > self.row_length - 1:
-                        col = 0
                     stringToReturn += bp[0] + str(col)
 
                 # append special indicator of index of all rows being touched
@@ -623,10 +599,10 @@ class StormySeas(Game):
             if curr_col != move_col or curr_row != move_row:
                 if curr_row != move_row:
                     direction = "down" if move_row > curr_row else "up"
-                    return f"boatb-{direction}"
+                    return f"boatp-{direction}"
                 else:
                     direction = "left" if move_col < curr_col else "right"
-                    return f"boatb-{direction}"
+                    return f"boatp-{direction}"
                     
         # Otherwise a wave row moved
         for row_i, (curr_row, move_row) in enumerate(zip(curr_rows, move_rows)):            
