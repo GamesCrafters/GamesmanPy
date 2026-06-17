@@ -3,7 +3,7 @@ from typing import Optional
 
 class StormySeas(Game):
     id = 'stormyseas'
-    variants = ["Beginner 1", "Beginner 2", "Intermediate 1", "Intermediate 2"]
+    variants = ["beg1", "beg2", "int1", "int2"]
     n_players = 1
     cyclic = False
     colors = ["R", "P"]
@@ -29,25 +29,25 @@ class StormySeas(Game):
         # d/row4 = 1011100
         # e/row5 = 1110100
 
-        if self._variant_id == "Beginner 1":
+        if self._variant_id == "beg1":
             self.default_rows = ["1011100","1011100","1010100","1101100","1110100"]
             self.row_length = len(self.default_rows[0])
             self.num_rows = len(self.default_rows)
             self.win_condition = "43"
 
-        if self._variant_id == "Beginner 2":
+        if self._variant_id == "beg2":
             self.default_rows = ["1011100","1011100","1110100","1010100","1101100"]
             self.row_length = len(self.default_rows[0])
             self.num_rows = len(self.default_rows)
             self.win_condition = "43"
 
-        if self._variant_id == "Intermediate 1":
+        if self._variant_id == "int1":
             self.default_rows = ["1011100","1011100","1101100","1010100","1110100"]
             self.row_length = len(self.default_rows[0])
             self.num_rows = len(self.default_rows)
             self.win_condition = "43"
 
-        if self._variant_id == "Intermediate 2":
+        if self._variant_id == "int2":
             self.default_rows = ["1110100","1010100","1101100","1011100","1011100"]
             self.row_length = len(self.default_rows[0])
             self.num_rows = len(self.default_rows)
@@ -56,7 +56,7 @@ class StormySeas(Game):
 
     def start(self) -> int:
         
-        if self._variant_id == "Beginner 1":
+        if self._variant_id == "beg1":
             self.board_rows = ["0010111","0101110","0010101","0110110","0111010"]
 
             curr_shift_string = "21211"
@@ -73,7 +73,7 @@ class StormySeas(Game):
             hash = self.hash(curr_shift_string + '7') 
             return hash
 
-        if self._variant_id == "Beginner 2":
+        if self._variant_id == "beg2":
             self.board_rows = ["0101110","0101110","0111010","1010100","0011011"]
 
             curr_shift_string = "11102"
@@ -92,7 +92,7 @@ class StormySeas(Game):
             return hash
 
         
-        if self._variant_id == "Intermediate 1":
+        if self._variant_id == "int1":
             self.board_rows = ["0010111","00101110","1101100","1010100","1110100"]
 
             curr_shift_string = "22000"
@@ -110,7 +110,7 @@ class StormySeas(Game):
             hash = self.hash(curr_shift_string + '7') 
             return hash
 
-        if self._variant_id == "Intermediate 2":
+        if self._variant_id == "int2":
             self.board_rows = ["0111010","0101010","1101100","0101110","0101110"]
 
             curr_shift_string = "11011"
