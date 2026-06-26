@@ -483,7 +483,6 @@ class StormySeas(Game):
         # Combine binary board + boat positions, then untranslate and hash
         full_string = binary_str + "".join(boat_pos_list)
 
-        # print(full_string + indicator)
         return self.hash(self.untranslate(full_string + indicator))
     
     
@@ -670,7 +669,6 @@ class StormySeas(Game):
     
     def indicatorTernary(self, indicator):
         # max is 1-9 integers used
-        # print(indicator + "blahhhhh")
         indicatorTern = self.toTernaryString(int(indicator)).rjust(3, "0")
         return indicatorTern  
     
@@ -728,5 +726,4 @@ class StormySeas(Game):
             elif row == "00" + expected_row[:self.row_length - 2]:
                 shifts += "2"
 
-        # print (shifts + boat_part + indicator)
         return shifts + boat_part + indicator
