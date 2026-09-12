@@ -1,10 +1,10 @@
 from models import Game, Value, StringMode
 from typing import Optional
 
-class Test(Game):
-    id = 'test'
+class Bug(Game):
+    id = 'bug'
     variants = ["regular"]
-    n_players = 1
+    n_players = 2
     cyclic = Falsefa
 
     def __init__(self, variant_id: str):
