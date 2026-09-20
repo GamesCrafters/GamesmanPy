@@ -8,7 +8,7 @@ class Bug(Game):
     id = 'bug'
     variants = ["regular"]
     n_players = 2
-    cyclic = Falsefa
+    cyclic = False
 
     def __init__(self, variant_id: str):
         """
