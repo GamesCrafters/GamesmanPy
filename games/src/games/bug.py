@@ -107,38 +107,38 @@ class Bug(Game):
 
 
 
- class Board:
-        def __init__(self, position):
-            self.lst = [[[None for _ in range(5)] for _ in range(5)] for _ in range(5)]
-            for i in range(5):
-                for j in range(5):
-                    for k in range(5):
-                        if abs((i -2) + (j - 2) + (k - 2)) > 2:
-                            pass
-                        self.lst[i][j][k] = position % 10
-                        position //= 10
-            self.player = position
-            
-            
-        def setitem (self, index, value):
-            self.lst[index[0]-2][index[1]-2][index[2]-2] = value
+    class Board:
+            def __init__(self, position):
+                self.lst = [[[None for _ in range(5)] for _ in range(5)] for _ in range(5)]
+                for i in range(5):
+                    for j in range(5):
+                        for k in range(5):
+                            if abs((i -2) + (j - 2) + (k - 2)) > 2:
+                                pass
+                            self.lst[i][j][k] = position % 10
+                            position //= 10
+                self.player = position
+                
+                
+            def setitem (self, index, value):
+                self.lst[index[0]-2][index[1]-2][index[2]-2] = value
 
-        def getitem(self, index):
-            return self.lst[index[0]-2][index[1]-2][index[2]-2]
+            def getitem(self, index):
+                return self.lst[index[0]-2][index[1]-2][index[2]-2]
 
-        def neighbors(self, index):
-            i = index[0]
-            j = index[1]
-            k = index[2]
-            neighbors = []
-            for di in [-1, 0, 1]:
-                for dj in [-1, 0, 1]:
-                    for dk in [-1, 0, 1]:
-                        if abs(di) + abs(dj) + abs(dk) == 1:
-                            ni, nj, nk = i + di, j + dj, k + dk
-                            if 0 <= ni < 5 and 0 <= nj < 5 and 0 <= nk < 5:
-                                neighbors.append((ni, nj, nk))
-            return neighbors
+            def neighbors(self, index):
+                i = index[0]
+                j = index[1]
+                k = index[2]
+                neighbors = []
+                for di in [-1, 0, 1]:
+                    for dj in [-1, 0, 1]:
+                        for dk in [-1, 0, 1]:
+                            if abs(di) + abs(dj) + abs(dk) == 1:
+                                ni, nj, nk = i + di, j + dj, k + dk
+                                if 0 <= ni < 5 and 0 <= nj < 5 and 0 <= nk < 5:
+                                    neighbors.append((ni, nj, nk))
+                return neighbors
 
     class Group:
         def __init__(self, index, board, bugs):
