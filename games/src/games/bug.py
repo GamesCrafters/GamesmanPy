@@ -31,8 +31,9 @@ class Bug(Game):
         """
         # First, eat all the bugs
         # Second, return a list of available placement (1, ji)
-
-
+        origin = [0,0,0]
+        board = Board(position)
+        player = board.player
         if position == 1:
             return [2, 3]
         elif position == 2:
@@ -103,5 +104,120 @@ class Bug(Game):
         """
         
         return str(move)
+
+
+
+ class Board:
+        def __init__(self, position):
+            self.lst = [[[None for _ in range(5)] for _ in range(5)] for _ in range(5)]
+            for i in range(5):
+                for j in range(5):
+                    for k in range(5):
+                        if abs((i -2) + (j - 2) + (k - 2)) > 2:
+                            pass
+                        self.lst[i][j][k] = position % 10
+                        position //= 10
+            self.player = position
+            
+            
+        def setitem (self, index, value):
+            self.lst[index[0]-2][index[1]-2][index[2]-2] = value
+
+        def getitem(self, index):
+            return self.lst[index[0]-2][index[1]-2][index[2]-2]
+
+        def neighbors(self, index):
+            i = index[0]
+            j = index[1]
+            k = index[2]
+            neighbors = []
+            for di in [-1, 0, 1]:
+                for dj in [-1, 0, 1]:
+                    for dk in [-1, 0, 1]:
+                        if abs(di) + abs(dj) + abs(dk) == 1:
+                            ni, nj, nk = i + di, j + dj, k + dk
+                            if 0 <= ni < 5 and 0 <= nj < 5 and 0 <= nk < 5:
+                                neighbors.append((ni, nj, nk))
+            return neighbors
+
+    class Group:
+        def __init__(self, index, board, bugs):
+            self.indexes = [index]
+            self.board = board
+            self.color = board.getitem(index)
+            self.size = 1
+            self.shape = ['', '', '']
+            self.bugs = bugs
+
+        def expand(self):
+            new_indexes = []
+            for index in self.indexes:
+                for neighbor in self.board.neighbors(index):
+                    if self.board.getitem(neighbor) == self.color and neighbor not in self.indexes and neighbor not in new_indexes:
+                        new_indexes.append(neighbor)
+                        if neighbor[0] < self.shape[0]:
+                            self.shape[0].append('-i')
+                        if neighbor[0] > self.shape[0]:
+                            self.shape[0].append('+i')
+                        if neighbor[1] < self.shape[1]:
+                            self.shape[1].append('-j')
+                        if neighbor[1] > self.shape[1]:
+                            self.shape[1].append('+j')
+                        if neighbor[2] < self.shape[2]:
+                            self.shape[2].append('-k')
+                        if neighbor[2] > self.shape[2]:
+                            self.shape[2].append('+k')
+            self.indexes.extend(new_indexes)
+            self.size = len(self.indexes)
+            if new_indexes:
+                self.expand()
+
+            def disassemble(self):
+                for index in self.indexes:
+                    self.board.setitem(index, 0)
+
+            def same_shape(self, bug):
+                axes = "ijk"
+                def parse(term):
+                    signs, sign = [], 1
+                    for ch in "".join(str(term).split()):
+                        if ch == "+":
+                            sign = 1
+                        elif ch == "-":
+                            sign = -1
+                        elif ch in axes:
+                            signs.append(sign)
+                        return tuple(signs)
+
+                def flip(slot):
+                    return tuple(-s for s in slot)
+
+                target = [parse(t) for t in bug.shape]
+                shape = [parse(t) for t in self.shape]
+
+                for _ in range(6):
+                    if shape == target:
+                        return True
+                    shape = [flip(shape[2]), shape[0], shape[1]]
+
+                return False
+
+            def try_eat(self):
+                gone = []
+                moves = [[],[],[],[],[],[]]
+                for index in self.indexes:
+                    for neighbor in self.board.neighbors(index):
+                        if self.board.getitem(neighbor) != self.color and self.board.getitem(neighbor) != 0:
+                            for bug in self.bugs:
+                                if neighbor in bug.indexes and bug.color != self.color and bug.size < self.size and self.same_shape(bug):
+                                    gone.append(bug)
+                i = 0
+                for bug in gone:
+                    for bug_index in bug.indexes:
+                        for point in self.board.neighbors(bug_index):
+                            if self.board.getitem(point) == 0 or point in bug.indexes:
+                                moves[bug_index[i]].append(point)
+                    i += 1
+                return moves
 
     
