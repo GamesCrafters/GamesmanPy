@@ -196,6 +196,9 @@ class LunarLockout(Game):
         if mode == StringMode.AUTOGUI:
             return "1_" + flat
 
+        if mode == StringMode.TUI:
+            return '\n'.join(' '.join(row) for row in board)
+
         return flat
 
 
