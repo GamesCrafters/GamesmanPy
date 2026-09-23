@@ -241,9 +241,10 @@ class Bug(Game):
         # 130132 <- means change 34 to 1, which is white, change 12 to black
         #if no moves left, return 10 for white win, or 20 for black win
 
-        # MANLIN'S PART FEEL FREE TO DELETE
-        # assume we get a 334455 etc. as placements for the current player type.
-        # NEED TO HAVE A FUNCTION THAT UNPACKS THE ABOVE INTO THE MORE DETAILED MOVE AS DESCRIBED 3 LINES UP
+        # MANLIN'S PART FEEL
+        # assume we get a 121122 etc. as valid placements for the current player type.
+        # ******NEED TO HAVE A FUNCTION THAT UNPACKS THE ABOVE INTO THE MORE DETAILED MOVE AS DESCRIBED 3 LINES UP*****
+        # the above is samantha's part!
 
         player_turn = 0 if len(str(position)) == 19 or 1 else len(str(position)) == 1
 
