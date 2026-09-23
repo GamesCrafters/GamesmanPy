@@ -45,6 +45,21 @@ class KaniNariEbi(Game):
     }
     _CHAR_TO_PIECE = {v: k for k, v in _PIECE_TO_CHAR.items()}
     
+    # ---------------------------- Move bit layout ----------------------------
+    # One part-move uses 13 bits:
+    #   bits  0..4  : src       (0..24)
+    #   bits  5..9  : dest      (0..24), BEFORE sea current
+    #   bits 10..11 : current   (0 none, 1 up, 2 down)
+    #   bit      12 : promote   (0/1)
+    #
+    # Full move:
+    #   bits  0..12 : main part
+    #   bits 13..25 : Bond part
+    #   bit      26 : whether Bond part exists
+    _PART_BITS = 13
+    _PART_MASK = (1 << _PART_BITS) - 1
+    _BOND_FLAG_BIT = 26
+
     # ========================================================
     # General Board Helpers
     # ========================================================
@@ -106,6 +121,177 @@ class KaniNariEbi(Game):
         turn = ((position >> 75) & 1) + 1
         return board, turn
 
+    # converts a move to a String 
+    # Convert binary move representation to a string move
+    # ex. 0b01110101110 -> "b2-2-u-d1-3-d"
+    def _part_to_string(self, part_code: int) -> str:
+        src, dest, current, promote = self._unpack_part(part_code)
+
+        # text = f"{self._square_name(src)}-{dest}-"
+
+        # if current == self._CURRENT_UP:
+        #     text += "u"
+        # elif current == self._CURRENT_DOWN:
+        #     text += "d"
+
+        # if promote:
+        #     text += "1"
+        # else:
+        #     text += "0"
+
+        text = f"{self._square_name(src)}->{self._square_name(dest)}"
+
+        if current == self._CURRENT_UP:
+            text += " current=up"
+        elif current == self._CURRENT_DOWN:
+            text += " current=down"
+
+        if promote:
+            text += " promote"
+
+        return text
+    
+    @staticmethod
+    def _square_name(square: int) -> str:
+        row, col = divmod(square, 5)
+        # Top row is rank 5, bottom row rank 1.
+        return f"{chr(ord('a') + col)}{5 - row}"
+
+    # ========================================================================
+    # Move encoding
+    # ========================================================================
+
+    def _pack_part(
+        self,
+        src: int,
+        dest: int,
+        current: int,
+        promote: bool,
+    ) -> int:
+        return (
+            src
+            | (dest << 5)
+            | (current << 10)
+            | (int(promote) << 12)
+        )
+
+    def _unpack_part(self, code: int) -> tuple[int, int, int, bool]:
+        src = code & 0b11111
+        dest = (code >> 5) & 0b11111
+        current = (code >> 10) & 0b11
+        promote = bool((code >> 12) & 1)
+        return src, dest, current, promote
+
+    def _pack_move(self, main_part: int, bond_part: Optional[int] = None) -> int:
+        move = main_part
+        if bond_part is not None:
+            move |= bond_part << self._PART_BITS
+            move |= 1 << self._BOND_FLAG_BIT
+        return move
+
+    def _unpack_move(self, move: int) -> tuple[int, Optional[int]]:
+        main_part = move & self._PART_MASK
+        has_bond = bool((move >> self._BOND_FLAG_BIT) & 1)
+
+        bond_part = None
+        if has_bond:
+            bond_part = (move >> self._PART_BITS) & self._PART_MASK
+
+        return main_part, bond_part
+
+    # ========================================================================
+    # Normal movement
+    # ========================================================================
+
+    def _normal_destinations(self, board: list[int], src: int) -> list[int]:
+        piece = board[src]
+        row, col = self._coord(src)
+        destinations: list[int] = []
+
+        # Crab: any number of empty squares horizontally, no jumping.
+        if self._is_crab(piece):
+            for dc in (-1, 1):
+                new_col = col + dc
+
+                while 0 <= new_col < self._COLS:
+                    dest = self._index(row, new_col)
+                    if board[dest] != self._EMPTY:
+                        break
+
+                    destinations.append(dest)
+                    new_col += dc
+
+        # Shrimp: exactly one diagonal square.
+        elif self._is_shrimp(piece):
+            for dr, dc in self._DIAGONAL:
+                new_row = row + dr
+                new_col = col + dc
+
+                if not self._on_board(new_row, new_col):
+                    continue
+
+                dest = self._index(new_row, new_col)
+                if board[dest] == self._EMPTY:
+                    destinations.append(dest)
+
+        return destinations
+
+    def _bond_destinations(self, board: list[int], src: int) -> list[int]:
+        """Bond bonus: ANY bonded piece moves exactly one diagonal square."""
+        row, col = self._coord(src)
+        destinations: list[int] = []
+
+        for dr, dc in self._DIAGONAL:
+            new_row = row + dr
+            new_col = col + dc
+
+            if not self._on_board(new_row, new_col):
+                continue
+
+            dest = self._index(new_row, new_col)
+            if board[dest] == self._EMPTY:
+                destinations.append(dest)
+
+        return destinations
+
+    @staticmethod
+    def _move_piece(board: list[int], src: int, dest: int) -> list[int]:
+        new_board = board.copy()
+        new_board[dest] = new_board[src]
+        new_board[src] = 0
+        return new_board
+
+    # ========================================================================
+    # Sea Current
+    # ========================================================================
+
+    def _current_destination(
+        self,
+        board: list[int],
+        src: int,
+        current: int,
+    ) -> int:
+        row, col = self._coord(src)
+
+        if col != 2 or current == self._CURRENT_NONE:
+            return src
+
+        if current == self._CURRENT_UP:
+            dr = -1
+        elif current == self._CURRENT_DOWN:
+            dr = 1
+        else:
+            raise ValueError("Invalid sea-current direction")
+
+        # Move as far as possible until blocked by another piece or edge.
+        while (
+            self._on_board(row + dr, col)
+            and board[self._index(row + dr, col)] == self._EMPTY
+        ):
+            row += dr
+
+        return self._index(row, col)
+        
     # ====================================================================
     # Primitive Helpers
     # ====================================================================    
@@ -138,6 +324,213 @@ class KaniNariEbi(Game):
             or not self._has_any_normal_move(board, 3 - player)
         )
 
+    # =======================================================================================
+    # String Helpers
+    # =======================================================================================
+
+    def _board_to_chars(self, board: list[int]) -> str:
+        return "".join(self._PIECE_TO_CHAR[piece] for piece in board)
+
+    def _chars_to_board(self, chars: str) -> list[int]:
+        if len(chars) != self._BOARD_SIZE:
+            raise ValueError("Board string must contain exactly 25 squares")
+
+        try:
+            return [self._CHAR_TO_PIECE[c] for c in chars]
+        except KeyError as exc:
+            raise ValueError(f"Invalid board character: {exc.args[0]}") from exc
+
+    # ========================================================================
+    # Promotion / current branching
+    # ========================================================================
+
+    def _expand_landing(
+        self,
+        board: list[int],
+        src: int,
+        dest: int,
+        player: int,
+    ) -> list[tuple[list[int], int, int, bool]]:
+        """Apply src->dest, then enumerate current and promotion choices.
+
+        Returns tuples:
+            (result_board, final_square, current_code, promote)
+
+        Capture is NOT resolved here.
+        """
+        moved_board = self._move_piece(board, src, dest)
+
+        # If movement initially stops in the middle column, player MUST choose
+        # UP or DOWN. Both choices are legal even if one results in no movement.
+        if self._coord(dest)[1] == 2:
+            current_choices = (self._CURRENT_UP, self._CURRENT_DOWN)
+        else:
+            current_choices = (self._CURRENT_NONE,)
+
+        results = []
+
+        for current in current_choices:
+            after_current = moved_board.copy()
+            final_square = dest
+
+            if current != self._CURRENT_NONE:
+                final_square = self._current_destination(
+                    after_current, dest, current
+                )
+
+                if final_square != dest:
+                    after_current = self._move_piece(
+                        after_current, dest, final_square
+                    )
+
+            piece = after_current[final_square]
+            can_promote = (
+                self._is_crab(piece)
+                and self._coord(final_square)[1]
+                == self._opponent_home_col(player)
+            )
+
+            # Promotion is optional.
+            if can_promote:
+                results.append(
+                    (after_current.copy(), final_square, current, False)
+                )
+
+                promoted = after_current.copy()
+                promoted[final_square] = self._shrimp_piece(player)
+                results.append((promoted, final_square, current, True))
+            else:
+                results.append(
+                    (after_current.copy(), final_square, current, False)
+                )
+
+        return results
+
+        # ========================================================================
+    # Bond -- STANDARD RULE: SAME TYPE ONLY
+    # ========================================================================
+
+    def _same_type_bond_group(
+        self,
+        board: list[int],
+        start: int,
+    ) -> set[int]:
+        """Return same-player, SAME-PIECE-TYPE orthogonal component.
+
+        Because piece equality is required, a Crab can only connect to Crabs
+        belonging to the same player, and likewise for Shrimps.
+        """
+        piece = board[start]
+        if piece == self._EMPTY:
+            return set()
+
+        visited = {start}
+        stack = [start]
+
+        while stack:
+            current = stack.pop()
+            row, col = self._coord(current)
+
+            for dr, dc in self._ORTHOGONAL:
+                new_row = row + dr
+                new_col = col + dc
+
+                if not self._on_board(new_row, new_col):
+                    continue
+
+                neighbor = self._index(new_row, new_col)
+
+                # Exact piece equality is what enforces same-type Bonding.
+                if neighbor not in visited and board[neighbor] == piece:
+                    visited.add(neighbor)
+                    stack.append(neighbor)
+
+        return visited
+
+    # ========================================================================
+    # Bond -- MIXED RULE: ANY TYPE
+    # ========================================================================
+
+    def _mixed_bond_group(
+        self,
+        board: list[int],
+        start: int,
+    ) -> set[int]:
+        """Return same-player orthogonal component (Crabs and Shrimps)."""
+        piece = board[start]
+        if piece == self._EMPTY:
+            return set()
+            
+        player = self._owner(piece)
+        visited = {start}
+        stack = [start]
+
+        while stack:
+            current = stack.pop()
+            row, col = self._coord(current)
+
+            for dr, dc in self._ORTHOGONAL:
+                new_row = row + dr
+                new_col = col + dc
+
+                if not self._on_board(new_row, new_col):
+                    continue
+
+                neighbor = self._index(new_row, new_col)
+
+                # Check ownership rather than exact piece equality
+                if neighbor not in visited and self._owner(board[neighbor]) == player:
+                    visited.add(neighbor)
+                    stack.append(neighbor)
+
+        return visited
+
+    # ========================================================================
+    # Capture
+    # ========================================================================
+
+    def _resolve_captures(
+        self,
+        board: list[int],
+        moved_piece_square: int,
+        player: int,
+    ) -> list[int]:
+        """Capture every opponent chain sandwiched by moved piece + friendly.
+
+        Only rows/columns count. Multiple sets can be captured at once.
+        """
+        new_board = board.copy()
+        start_row, start_col = self._coord(moved_piece_square)
+        captured: set[int] = set()
+
+        for dr, dc in self._ORTHOGONAL:
+            row = start_row + dr
+            col = start_col + dc
+            opponent_line: list[int] = []
+
+            while self._on_board(row, col):
+                square = self._index(row, col)
+                square_owner = self._owner(new_board[square])
+
+                # Keep scanning through a contiguous opponent chain.
+                if square_owner == 3 - player:
+                    opponent_line.append(square)
+                    row += dr
+                    col += dc
+                    continue
+
+                # Chain is captured only if closed by one of our pieces.
+                if square_owner == player and opponent_line:
+                    captured.update(opponent_line)
+
+                # Empty square or friendly piece ends this direction scan.
+                break
+
+        for square in captured:
+            new_board[square] = self._EMPTY
+
+        return new_board
+
     # ====================================================================================================================
     # GamesCrafters Functions
     # ====================================================================================================================
@@ -145,9 +538,11 @@ class KaniNariEbi(Game):
         """
         Define instance variables here (i.e. variant information)
         """
-        if variant_id not in Example.variants:
+        if variant_id not in self.variants:
             raise ValueError("Variant not defined")
         self._variant_id = variant_id
+        
+
         pass
 
     def start(self) -> int:
@@ -167,7 +562,7 @@ class KaniNariEbi(Game):
         """
         Returns a list of positions given the input position.
         """
-        board, player = self._unhash_position(position)
+        board, player = self._unhash(position)
 
         # Do not generate moves from an already-finished position.
         previous_player = 3 - player
@@ -266,16 +661,58 @@ class KaniNariEbi(Game):
         return list(dict.fromkeys(moves))
         pass
 
-    
-    def do_move(board: list[int], src: int, dest: int) -> list[int]:
-        """
-        Returns the resulting position of applying move to position.
-        """
-        new_board = board.copy()
-        new_board[dest] = new_board[src]
-        new_board[src] = 0
+    def _apply_part(self, board: list[int], part_code: int, player: int) -> list[int]:
+        src, dest, current, promote = self._unpack_part(part_code)
+
+        new_board = self._move_piece(board, src, dest)
+        final_square = dest
+
+        # Sea current.
+        if current != self._CURRENT_NONE:
+            final_square = self._current_destination(
+                new_board, dest, current
+            )
+
+            if final_square != dest:
+                new_board = self._move_piece(
+                    new_board, dest, final_square
+                )
+
+        # Optional promotion.
+        if promote:
+            new_board[final_square] = self._shrimp_piece(player)
+
+        # Deterministic capture.
+        new_board = self._resolve_captures(
+            new_board, final_square, player
+        )
+
         return new_board
-        pass
+
+    def do_move(self, position: int, move: int) -> int:
+        board, player = self._unhash(position)
+        main_part, bond_part = self._unpack_move(move)
+
+        new_board = self._apply_part(board, main_part, player)
+
+        # A generated move will never contain Bond after an immediate win,
+        # but this guard makes do_move robust on manually constructed moves.
+        if bond_part is not None and not self._wins_immediately(new_board, player):
+            new_board = self._apply_part(
+                new_board, bond_part, player
+            )
+
+        return self._hash(new_board, 3 - player)
+    # def do_move(board: list[int], src: int, dest: int) -> list[int]:
+    #     """
+    #     Returns the resulting position of applying move to position.
+    #     """
+        
+    #     new_board = board.copy()
+    #     new_board[dest] = new_board[src]
+    #     new_board[src] = 0
+    #     return new_board
+    #     pass
 
     def primitive(self, position: int) -> Optional[Value]:
         """
@@ -297,7 +734,6 @@ class KaniNariEbi(Game):
             return Value.Loss
 
         return None        
-
         pass
 
     # hash current position into printable String board representation
@@ -305,17 +741,18 @@ class KaniNariEbi(Game):
         """
         Returns a string representation of the position based on the given mode.
         """
-        board_nums, turn = self._unhash(position)
-        player = 3 - turn
-        
-        # todo note: convert board_nums into pos_str (go from # board -> char board. This is output)
-        if mode == StringMode.AUTOGUI:
-            autogui_player = '1_' if player == 1 else '2_'
-            pos_str = autogui_player + pos_str
-        elif mode == StringMode.Readable:
+        board, turn = self._unhash(position)
+        chars = self._board_to_chars(board)
 
-        return pos_str
-        pass
+        if mode == StringMode.AUTOGUI:
+            return f"{turn}_{chars}"
+
+        if mode == StringMode.TUI:
+            rows = [chars[r * 5:(r + 1) * 5] for r in range(5)]
+            return "\n".join(rows) + f"\nturn={turn}"
+
+        if mode == StringMode.Readable:
+            return f"{chars}|{turn}"
 
     # unhash String board representation to the actual position
     def from_string(self, strposition: str) -> int:
@@ -323,6 +760,33 @@ class KaniNariEbi(Game):
         Returns the position from a string representation of the position.
         Input string is StringMode.Readable.
         """
+        # src, dest, current, promote = self._unpack_part(part_code)
+
+        # text = f"{self._square_name(src)}->{self._square_name(dest)}"
+
+        # if current == self._CURRENT_UP:
+        #     text += " current = up"
+        # elif current == self._CURRENT_DOWN:
+        #     text += " current = down"
+
+        # if promote:
+        #     text += " promote"
+
+        # return text
+
+        try:
+            chars, turn_str = strposition.split("|")
+            turn = int(turn_str)
+        except Exception as exc:
+            raise ValueError(
+                "Readable position must have format '<25 board chars>|<turn>'"
+            ) from exc
+
+        if turn not in (1, 2):
+            raise ValueError("Turn must be 1 or 2")
+
+        board = self._chars_to_board(chars)
+        return self._hash(board, turn)
         pass
 
     # converts a move to a String 
@@ -336,6 +800,8 @@ class KaniNariEbi(Game):
         # readable multipart description for all modes. A dedicated AutoGUI
         # half-move layer can be added later without changing solver logic.
         main_part, bond_part = self._unpack_move(move)
+        #main_part -> bits of main part of move
+        #bond_part -> bits of bond part of move
 
         text = self._part_to_string(main_part)
 
