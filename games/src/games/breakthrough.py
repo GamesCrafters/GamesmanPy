@@ -3,9 +3,13 @@ from typing import Optional
 
 class Breakthrough(Game):
     id = 'breakthrough'
-    variants = ["3x5", "4x4", "4x5"]
+    variants = ["3x5", "3x4"]
     n_players = 2
     cyclic = False
+
+    # Most variants use 2 pawn rows per side; "3x4" is the small tutorial
+    # board and uses just 1.
+    _pawn_rows_by_variant = {"3x4": 1}
 
     # Directions are relative to the mover, not absolute board directions.
     _straight = 0b00
@@ -24,7 +28,7 @@ class Breakthrough(Game):
         # variant_id looks like "3x5"
         self._cols = int(variant_id[0])
         self._rows = int(variant_id[2])
-        self._pawn_rows = 2  # rows of pawns per side
+        self._pawn_rows = Breakthrough._pawn_rows_by_variant.get(variant_id, 2)
 
     def start(self) -> int:
         """
