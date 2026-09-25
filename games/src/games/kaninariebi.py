@@ -707,7 +707,7 @@ class KaniNariEbi(Game):
                 new_board, bond_part, player
             )
 
-        return self._hash(new_board, 3 - player)
+        return self._hash_position(new_board, 3 - player)
     # def do_move(board: list[int], src: int, dest: int) -> list[int]:
     #     """
     #     Returns the resulting position of applying move to position.
@@ -791,7 +791,7 @@ class KaniNariEbi(Game):
             raise ValueError("Turn must be 1 or 2")
 
         board = self._chars_to_board(chars)
-        return self._hash(board, turn)
+        return self._hash_position(board, turn)
         pass
 
     # converts a move to a String 
