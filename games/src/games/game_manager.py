@@ -3,6 +3,7 @@ from .clobber import Clobber
 from .flowfree import FlowFree
 from .hashi import Hashi
 from .horses import Horses
+from .kaninariebi import KaniNariEbi
 from .klotski import Klotski
 from .lunarlockout import LunarLockout
 from .marble_circuit import MarbleCircuit
@@ -20,6 +21,7 @@ game_list = {
     "flowfree": FlowFree,
     "hashi": Hashi,
     "horses": Horses,    
+    "kaninariebi": KaniNariEbi,
     "klotski": Klotski,
     "lunarlockout": LunarLockout,
     "marble_circuit": MarbleCircuit,
