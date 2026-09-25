@@ -103,22 +103,27 @@ class KaniNariEbi(Game):
     # ===============================================================
     # Hashing / Unhashing Board
     # ===============================================================
-    def _hash(self, board: list[int], turn: int) -> int:
-        """Encode 25 squares using 3 bits each, plus 1 turn bit."""
+    def _hash_position(self, board: list[int], turn: int) -> int:
         position = 0
-        for i, piece in enumerate(board):
-            position |= piece << (3 * i)
+        multiplier = 1
 
-        # bit 75 (position bit): 0 => P1, 1 => P2
-        position |= (turn - 1) << 75
-        return position
+        for piece in board:
+            position += piece * multiplier
+            multiplier *= 5
 
-    def _unhash(self, position: int) -> tuple[list[int], int]:
+        return position * 2 + (turn - 1)
+
+
+    def _unhash_position(self, position: int) -> tuple[list[int], int]:
+        turn = (position % 2) + 1
+        position //= 2
+
         board = [self._EMPTY] * self._BOARD_SIZE
-        for i in range(self._BOARD_SIZE):
-            board[i] = (position >> (3 * i)) & 0b111
 
-        turn = ((position >> 75) & 1) + 1
+        for i in range(self._BOARD_SIZE):
+            board[i] = position % 5
+            position //= 5
+
         return board, turn
 
     # converts a move to a String 
@@ -555,14 +560,14 @@ class KaniNariEbi(Game):
             board[self._index(row, 0)] = self._P1_CRAB
             board[self._index(row, 4)] = self._P2_CRAB
 
-        return self._hash(board, 1)        
+        return self._hash_position(board, 1)        
         pass
     
     def generate_moves(self, position: int) -> list[int]:
         """
         Returns a list of positions given the input position.
         """
-        board, player = self._unhash(position)
+        board, player = self._unhash_position(position)
 
         # Do not generate moves from an already-finished position.
         previous_player = 3 - player
@@ -690,7 +695,7 @@ class KaniNariEbi(Game):
         return new_board
 
     def do_move(self, position: int, move: int) -> int:
-        board, player = self._unhash(position)
+        board, player = self._unhash_position(position)
         main_part, bond_part = self._unpack_move(move)
 
         new_board = self._apply_part(board, main_part, player)
@@ -718,7 +723,7 @@ class KaniNariEbi(Game):
         """
         Returns a Value enum which defines whether the current position is a win, loss, or non-terminal. 
         """
-        board, current_player = self._unhash(position)
+        board, current_player = self._unhash_position(position)
         previous_player = 3 - current_player
 
         # If the player who just moved reached either material win condition,
@@ -741,7 +746,7 @@ class KaniNariEbi(Game):
         """
         Returns a string representation of the position based on the given mode.
         """
-        board, turn = self._unhash(position)
+        board, turn = self._unhash_position(position)
         chars = self._board_to_chars(board)
 
         if mode == StringMode.AUTOGUI:
