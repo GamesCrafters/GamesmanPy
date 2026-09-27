@@ -1,10 +1,35 @@
 from models import Game, Value, StringMode
 from typing import Optional
+import copy
 
 class CardInfo:
     def __init__(self, moves: int, color: str):
         self.moves = moves
         self.color = color
+
+class OnitamaPosition:
+    def __init__(self, red_cards: set[str], blue_cards: set[str], neutral_card: str, board):
+        self.active_player = None
+        self.red_cards = red_cards
+        self.blue_cards = blue_cards
+        self.card_in_queue_for_blue = None
+        self.card_in_queue_for_red = None
+
+        self.board = board
+
+        neutral_card_color = Onitama.cards_3x4[neutral_card].color
+        if neutral_card_color == 'red':
+            self.card_in_queue_for_red = neutral_card
+            self.active_player = 'red' 
+        else:
+            self.card_in_queue_for_blue = neutral_card
+            self.active_player = 'blue'
+
+    def __repr__(self):
+        board_string = ''
+        for row in self.board:
+            board_string += str(row) + '\n'
+        return f'{self.active_player}/{self.red_cards}/{self.blue_cards}/{self.card_in_queue_for_blue}/{self.card_in_queue_for_red}\n{board_string}'
 
 class OnitamaMove:
     def __init__(self, starting_square, ending_square, card_used):
@@ -42,6 +67,14 @@ class OnitamaPosition:
 class Onitama(Game):
     id = 'onitama'
     variants = ["3x4"]
+    cards_3x4 = {
+        'dog': CardInfo([(0, -2)], 'red'), # forward 2
+        'lobster': CardInfo([(0, 1)], 'red'), # backward 1
+        'frog': CardInfo([(-1, -1), (1, -1)], 'red'), # pawn capture
+        'toad': CardInfo([(-1, 1), (1, 1)], 'blue'), # reverse pawn capture
+        'crab': CardInfo([(-1, 0), (1, 0)], 'blue') # sideways
+    }
+
     n_players = 2
     cyclic = True
 
@@ -65,27 +98,13 @@ class Onitama(Game):
         """
         Returns the starting position of the game.
         """
-        variant = self._variant_id
+        board_size = (int(self._variant_id[0]), int(self._variant_id[2]))
 
-        # TODO: Implement varying board sizes for different variants
-        num_rows = variant[3]
-        num_cols = variant[0]
+        board = [['' for col in range(board_size[0])] for row in range(board_size[1])]
+        board[0] = ['P' if col != board_size[0] // 2 else 'M' for col in range(board_size[0])]
+        board[-1] = ['p' if col != board_size[0] // 2 else 'm' for col in range(board_size[0])]
 
-        blue_home_row = 'PMP'
-        empty_row = 'ooo'
-        red_home_row = 'pmp'
-        
-        return OnitamaPosition(blue_home_row + empty_row + empty_row + red_home_row,
-                               {'dog', 'lobster'}, {'toad', 'crab'}, card_in_queue_for_red= 'frog')
-
-    def generate_single_move(self, move, position):
-        
-        new_row = row + move[1]
-        new_col = col + move[0]
-        if position.board[row][col] in movable_pieces:
-            if new_row >= 0 and new_row < board_row_count and new_col >= 0 and new_col < board_col_count:
-                if position.board[new_row][new_col] not in movable_pieces:
-                    valid_moves.append(OnitamaMove((row, col), (new_row, new_col), card))
+        return OnitamaPosition({'dog', 'lobster'}, {'toad', 'crab'}, 'frog', board)
     
     def generate_moves(self, position: OnitamaPosition) -> list[OnitamaMove]:
         """
@@ -96,15 +115,25 @@ class Onitama(Game):
         if position.active_player == 'red':
             movable_pieces = {'p', 'm'}
             active_player_cards = position.red_cards
+            active_player_cards = position.red_cards
         else:
             movable_pieces = {'P', 'M'}
             active_player_cards = position.blue_cards
+            active_player_cards = position.blue_cards
 
         for card in active_player_cards:
+        for card in active_player_cards:
             for move in Onitama.cards_3x4[card].moves:
-                onitama_move = self.generate_single_move(move, moveable_pieces, position)
-                if onitama_move != None:
-                    valid_moves.append(onitama_move)
+                board_row_count = len(position.board)
+                board_col_count = len(position.board[0])
+                for row in range(board_row_count):
+                    for col in range(board_col_count):
+                        new_row = row + move[1] * (-1 if position.active_player == 'blue' else 1)
+                        new_col = col + move[0] * (-1 if position.active_player == 'blue' else 1)
+                        if position.board[row][col] in movable_pieces:
+                            if new_row >= 0 and new_row < board_row_count and new_col >= 0 and new_col < board_col_count:
+                                if position.board[new_row][new_col] not in movable_pieces:
+                                    valid_moves.append(OnitamaMove((row, col), (new_row, new_col), card))
 
         return valid_moves
     
@@ -116,6 +145,7 @@ class Onitama(Game):
         # TODO: make this mutable
 
         # move the piece
+        position = copy.deepcopy(position)
         position.board[move.ending_square[0]][move.ending_square[1]] = position.board[move.starting_square[0]][move.starting_square[1]] 
         position.board[move.starting_square[0]][move.starting_square[1]] = ''
         
@@ -194,13 +224,16 @@ class Onitama(Game):
         """
         Returns a string representation of the move based on the given mode.
         """
-        pass
+        return repr(move)
 
 o = Onitama("3x4")
 starting_position = o.start()
+print(starting_position)
 moves = o.generate_moves(starting_position)
 print(moves)
 new_pos = o.do_move(starting_position, moves[0])
 print(new_pos.board)
 print(o.primitive(new_pos))
 print(new_pos)
+moves = o.generate_moves(new_pos)
+print(moves)
