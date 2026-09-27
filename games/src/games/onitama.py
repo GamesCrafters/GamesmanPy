@@ -39,30 +39,6 @@ class OnitamaMove:
 
     def __repr__(self):
         return f'{self.starting_square} to {self.ending_square} using {self.card_used}'
-    
-class OnitamaPosition:
-    def __init__(self,
-                 board_x_length: int, board: str,
-                 red_cards: tuple[str], blue_cards: tuple[str], 
-                 card_in_queue_for_blue = None, card_in_queue_for_red = None, 
-                 ):
-        
-        self.board_x_length = board_x_length
-        self.board = board
-
-        self.red_cards = red_cards
-        self.blue_cards = blue_cards
-
-        self.card_in_queue_for_blue = card_in_queue_for_blue
-        self.card_in_queue_for_red = card_in_queue_for_red
-
-        if card_in_queue_for_red != None:
-            self.active_player = 'red'
-        else:
-            self.active_player = 'blue'
-
-    def __repr__(self):
-        return f'{self.active_player}/{self.red_cards}/{self.blue_cards}/{self.card_in_queue_for_blue}/{self.card_in_queue_for_red}/{self.board}'
 
 class Onitama(Game):
     id = 'onitama'
@@ -77,15 +53,7 @@ class Onitama(Game):
 
     n_players = 2
     cyclic = True
-
-    cards_3x4 = {
-        'dog': CardInfo((6), 'red'), # forward 2 squares
-        'lobster': CardInfo((-3), 'red'), # backward 1 square
-        'frog': CardInfo((4, 2), 'red'), # moves like pawn captures
-        'toad': CardInfo((-4, -2), 'blue'), # moves like pawn captures in reverse
-        'crab': CardInfo((-1, 1), 'blue') # moves 1 square sideways
-    }
-
+    
     def __init__(self, variant_id: str):
         """
         Define instance variables here (i.e. variant information)
@@ -115,13 +83,10 @@ class Onitama(Game):
         if position.active_player == 'red':
             movable_pieces = {'p', 'm'}
             active_player_cards = position.red_cards
-            active_player_cards = position.red_cards
         else:
             movable_pieces = {'P', 'M'}
             active_player_cards = position.blue_cards
-            active_player_cards = position.blue_cards
 
-        for card in active_player_cards:
         for card in active_player_cards:
             for move in Onitama.cards_3x4[card].moves:
                 board_row_count = len(position.board)
@@ -141,8 +106,6 @@ class Onitama(Game):
         """
         Returns the resulting position of applying move to position.
         """
-
-        # TODO: make this mutable
 
         # move the piece
         position = copy.deepcopy(position)
