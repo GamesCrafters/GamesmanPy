@@ -100,7 +100,7 @@ class Onitama(Game):
         board[0] = ['P' if col != board_size[0] // 2 else 'M' for col in range(board_size[0])]
         board[-1] = ['p' if col != board_size[0] // 2 else 'm' for col in range(board_size[0])]
 
-        return OnitamaPosition({'dog', 'lobster'}, {'toad', 'frog'}, board, neutral_card='crab')
+        return OnitamaPosition({'dog', 'crab'}, {'toad', 'frog'}, board, neutral_card='lobster')
     
     def generate_moves(self, position: OnitamaPosition) -> list[OnitamaMove]:
         """
