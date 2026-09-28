@@ -95,42 +95,45 @@ class Clusterfuss(Game):
         return self.hash(board, RED)
 
     def generate_moves(self, position: int) -> list[int]:
-        """
-        Returns a list of moves given the input position.
-
-        TODO(core): for every checker of the player to move, for every occupied
-        orthogonal neighbour, the capture is a candidate.  Keep a candidate only
-        if `self.is_legal(board_after_capture, player)` holds.  If the player has
-        checkers but no legal capture, their turn is skipped: return
-        `[self._skip_move]`.
-
-        (Both players being stuck at once would loop forever and break
-        `cyclic = False`, but that cannot happen: the board is always a single
-        group, so the two colours are never out of each other's reach.)
-        """
-        pass
+        (board, player) = self.unhash(position)
+        if player not in board:
+            return []
+        moves = []
+        for index in range(self._n_cells):
+            if board[index] != player:
+                continue
+            for (dir, target) in self.neighbors(index):
+                if board[target] == EMPTY:
+                    continue
+                after = board[:]
+                after[target] = player
+                after[index] = EMPTY
+                # Legal only if exactly one group holds the mover's checkers.
+                if sum(1 for group in self.groups(after)
+                       if any(after[i] == player for i in group)) == 1:
+                    moves.append((index << 2) | dir)
+        return moves if moves else [self._skip_move]
 
     def do_move(self, position: int, move: int) -> int:
-        """
-        Returns the resulting position of applying move to position.
-
-        TODO(core): decode the move, move the checker onto the captured square
-        (clearing the source square), then remove every detached enemy-only
-        group via `self.remove_enemy_only_groups`, then hand the turn over.
-        A skip move only hands the turn over.
-        """
-        pass
+       
+        (board, player) = self.unhash(position)
+        if move != self._skip_move:
+            (index, dir) = self.decode_move(move)
+            target = self.step(index, dir)
+            board[target] = player
+            board[index] = EMPTY
+            for group in self.groups(board):
+                if not any(board[i] == player for i in group):
+                    for i in group:
+                        board[i] = EMPTY
+        return self.hash(board, self.opponent(player))
 
     def primitive(self, position: int) -> Optional[Value]:
-        """
-        Returns a Value enum which defines whether the current position is a win,
-        loss, or non-terminal.
-
-        TODO(core): the player to move has lost once none of their checkers are
-        left on the board — the opponent achieved the object of the game.
-        Otherwise return None; there is no drawn or tied ending.
-        """
-        pass
+        
+        (board, player) = self.unhash(position)
+        if player not in board:
+            return Value.Loss
+        return None
 
     def to_string(self, position: int, mode: StringMode) -> str:
         """
