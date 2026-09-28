@@ -72,11 +72,11 @@ class Onitama(Game):
     id = 'onitama'
     variants = ["3x3"]
     cards_3x3 = {
-        'dog': CardInfo([(0, -1)], 'red'), # forward 1
-        'lobster': CardInfo([(0, 1)], 'red'), # backward 1
-        'frog': CardInfo([(-1, -1), (1, -1)], 'red'), # pawn capture
-        'toad': CardInfo([(-1, 1), (1, 1)], 'blue'), # reverse pawn capture
-        'crab': CardInfo([(-1, 0), (1, 0)], 'blue') # sideways
+        'horse': CardInfo([(0, 1), (-1, 0), (0, -1)], 'red'), # up, left, back
+        'goose': CardInfo([(-1, 0), (1, 0), (-1, 1), (1, -1)], 'red'), # sideways, left + up, right + down
+        'elephant': CardInfo([(-1, 0), (1, 0), (-1, 1), (1, 1)], 'red'), # sideways, pawn capture
+        'mantis': CardInfo([(0, -1), (-1, 1), (1, 1)], 'blue'), # down, pawn capture
+        'rat': CardInfo([(0, 1), (-1, 0), (1, 1)], 'blue') # up, left, right + down
     }
 
     n_players = 2
@@ -100,7 +100,7 @@ class Onitama(Game):
         board[0] = ['P' if col != board_size[0] // 2 else 'M' for col in range(board_size[0])]
         board[-1] = ['p' if col != board_size[0] // 2 else 'm' for col in range(board_size[0])]
 
-        return OnitamaPosition({'dog', 'crab'}, {'toad', 'frog'}, board, neutral_card='lobster')
+        return OnitamaPosition({'horse', 'goose'}, {'mantis', 'rat'}, board, neutral_card='elephant')
     
     def generate_moves(self, position: OnitamaPosition) -> list[OnitamaMove]:
         """
@@ -121,7 +121,7 @@ class Onitama(Game):
                 board_col_count = len(position.board[0])
                 for row in range(board_row_count):
                     for col in range(board_col_count):
-                        new_row = row + move[1] * (-1 if position.active_player == 'blue' else 1)
+                        new_row = row - move[1] * (-1 if position.active_player == 'blue' else 1)
                         new_col = col + move[0] * (-1 if position.active_player == 'blue' else 1)
                         if position.board[row][col] in movable_pieces:
                             if new_row >= 0 and new_row < board_row_count and new_col >= 0 and new_col < board_col_count:
@@ -226,7 +226,7 @@ class Onitama(Game):
         return repr(move)
 
     def hash_ext(self, position: OnitamaPosition) -> int:
-        card_list = ['dog', 'lobster', 'frog', 'toad', 'crab']
+        card_list = ['horse', 'goose', 'elephant', 'mantis', 'rat']
         piece_lut = {'': 0, 'p': 1, 'm': 2, 'P': 3, 'M': 4}
 
         # active player 1 bit
@@ -251,7 +251,7 @@ class Onitama(Game):
         return hash_val
 
     def unhash_ext(self, hash_val: int) -> OnitamaPosition:
-        card_list = ['dog', 'lobster', 'frog', 'toad', 'crab']
+        card_list = ['horse', 'goose', 'elephant', 'mantis', 'rat']
         piece_lut = {0: '', 1: 'p', 2: 'm', 3: 'P', 4: 'M'}
 
         # board
