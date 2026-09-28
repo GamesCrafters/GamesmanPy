@@ -64,7 +64,7 @@ class OnitamaMove:
         col_lut = {0: 'a', 1: 'b', 2: 'c'}
         row_lut = {0: '3', 1: '2', 2: '1'}
         if self.starting_square != self.ending_square:
-            return f'{col_lut[self.starting_square[1]]}{row_lut[self.starting_square[0]]}{col_lut[self.ending_square[1]]}{row_lut[self.ending_square[0]]}'
+            return f'{self.card_used[0]}{col_lut[self.starting_square[1]]}{row_lut[self.starting_square[0]]}{col_lut[self.ending_square[1]]}{row_lut[self.ending_square[0]]}'
         else:
             return self.card_used
 
@@ -230,8 +230,7 @@ class Onitama(Game):
         piece_lut = {'': 0, 'p': 1, 'm': 2, 'P': 3, 'M': 4}
 
         # active player 1 bit
-        hash_val = 0
-        hash_val = hash_val * 2 + (0 if position.active_player == 'red' else 1)
+        hash_val = 0 if position.active_player == 'red' else 1
             
         # which card in which hand? 3 * 5 bits
         for card in card_list:
