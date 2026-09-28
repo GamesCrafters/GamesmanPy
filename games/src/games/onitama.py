@@ -8,28 +8,51 @@ class CardInfo:
         self.color = color
 
 class OnitamaPosition:
-    def __init__(self, red_cards: set[str], blue_cards: set[str], neutral_card: str, board):
+    def __init__(self, red_cards: set[str], blue_cards: set[str], board, neutral_card = None, card_in_queue_for_blue = None, card_in_queue_for_red = None):
         self.active_player = None
         self.red_cards = red_cards
         self.blue_cards = blue_cards
-        self.card_in_queue_for_blue = None
-        self.card_in_queue_for_red = None
+        self.card_in_queue_for_blue = card_in_queue_for_blue
+        self.card_in_queue_for_red = card_in_queue_for_red
 
         self.board = board
 
-        neutral_card_color = Onitama.cards_3x4[neutral_card].color
-        if neutral_card_color == 'red':
-            self.card_in_queue_for_red = neutral_card
-            self.active_player = 'red' 
-        else:
-            self.card_in_queue_for_blue = neutral_card
-            self.active_player = 'blue'
+        if neutral_card is not None:
+            neutral_card_color = Onitama.cards_3x3[neutral_card].color
+            if neutral_card_color == 'red':
+                self.card_in_queue_for_red = neutral_card
+                self.active_player = 'red' 
+            else:
+                self.card_in_queue_for_blue = neutral_card
+                self.active_player = 'blue'
 
     def __repr__(self):
         board_string = ''
         for row in self.board:
-            board_string += str(row) + '\n'
-        return f'{self.active_player}/{self.red_cards}/{self.blue_cards}/{self.card_in_queue_for_blue}/{self.card_in_queue_for_red}\n{board_string}'
+            board_string += str([' ' if item == '' else item for item in row]) + '\n'
+        return f"""Active Payer: {self.active_player}
+Red Cards: {sorted(list(self.red_cards))}
+Blue Cards: {sorted(list(self.blue_cards))}
+Blue Queued Card: {self.card_in_queue_for_blue}
+Red Queued Card: {self.card_in_queue_for_red}
+==== Board ====
+{board_string}==============="""
+
+    # def __hash__(self):
+    #     return hash(repr(self))
+
+    # def __eq__(self, value):
+    #     if type(value) is not OnitamaPosition:
+    #         return False
+
+    #     if (value.red_cards == self.red_cards and
+    #         value.blue_cards == self.blue_cards and
+    #         value.card_in_queue_for_blue == self.card_in_queue_for_blue and
+    #         value.card_in_queue_for_red == self.card_in_queue_for_red and
+    #         value.board == self.board):
+    #         return True
+
+    #     return False
 
 class OnitamaMove:
     def __init__(self, starting_square, ending_square, card_used):
@@ -38,13 +61,18 @@ class OnitamaMove:
         self.card_used = card_used
 
     def __repr__(self):
-        return f'{self.starting_square} to {self.ending_square} using {self.card_used}'
+        col_lut = {0: 'a', 1: 'b', 2: 'c'}
+        row_lut = {0: '3', 1: '2', 2: '1'}
+        if self.starting_square != self.ending_square:
+            return f'{col_lut[self.starting_square[1]]}{row_lut[self.starting_square[0]]}{col_lut[self.ending_square[1]]}{row_lut[self.ending_square[0]]}'
+        else:
+            return self.card_used
 
 class Onitama(Game):
     id = 'onitama'
-    variants = ["3x4"]
-    cards_3x4 = {
-        'dog': CardInfo([(0, -2)], 'red'), # forward 2
+    variants = ["3x3"]
+    cards_3x3 = {
+        'dog': CardInfo([(0, -1)], 'red'), # forward 1
         'lobster': CardInfo([(0, 1)], 'red'), # backward 1
         'frog': CardInfo([(-1, -1), (1, -1)], 'red'), # pawn capture
         'toad': CardInfo([(-1, 1), (1, 1)], 'blue'), # reverse pawn capture
@@ -72,7 +100,7 @@ class Onitama(Game):
         board[0] = ['P' if col != board_size[0] // 2 else 'M' for col in range(board_size[0])]
         board[-1] = ['p' if col != board_size[0] // 2 else 'm' for col in range(board_size[0])]
 
-        return OnitamaPosition({'dog', 'lobster'}, {'toad', 'crab'}, 'frog', board)
+        return OnitamaPosition({'dog', 'lobster'}, {'toad', 'frog'}, board, neutral_card='crab')
     
     def generate_moves(self, position: OnitamaPosition) -> list[OnitamaMove]:
         """
@@ -88,7 +116,7 @@ class Onitama(Game):
             active_player_cards = position.blue_cards
 
         for card in active_player_cards:
-            for move in Onitama.cards_3x4[card].moves:
+            for move in Onitama.cards_3x3[card].moves:
                 board_row_count = len(position.board)
                 board_col_count = len(position.board[0])
                 for row in range(board_row_count):
@@ -100,26 +128,34 @@ class Onitama(Game):
                                 if position.board[new_row][new_col] not in movable_pieces:
                                     valid_moves.append(OnitamaMove((row, col), (new_row, new_col), card))
 
+        # edge case where no move is possible
+        if valid_moves == []:
+            for card in active_player_cards:
+                valid_moves.append(OnitamaMove((0, 0), (0, 0), card))
+
         return valid_moves
     
-    def do_move(self, position: OnitamaPosition, move: OnitamaMove) -> OnitamaPosition:
+    def do_move(self, old_position: OnitamaPosition, move: OnitamaMove) -> OnitamaPosition:
         """
         Returns the resulting position of applying move to position.
         """
 
         # move the piece
-        position = copy.deepcopy(position)
-        position.board[move.ending_square[0]][move.ending_square[1]] = position.board[move.starting_square[0]][move.starting_square[1]] 
+        position = copy.deepcopy(old_position)
+        piece_moved = position.board[move.starting_square[0]][move.starting_square[1]] 
         position.board[move.starting_square[0]][move.starting_square[1]] = ''
+        position.board[move.ending_square[0]][move.ending_square[1]] = piece_moved
         
         # swap the player and rotate cards
         if position.active_player == 'red':
-            position.card_in_queue_for_blue = position.red_cards.remove(move.card_used)
+            position.red_cards.remove(move.card_used)
+            position.card_in_queue_for_blue = move.card_used
             position.red_cards.add(position.card_in_queue_for_red)
             position.card_in_queue_for_red = None
             position.active_player = 'blue'
         else:
-            position.card_in_queue_for_red = position.blue_cards.remove(move.card_used)
+            position.blue_cards.remove(move.card_used)
+            position.card_in_queue_for_red = move.card_used
             position.blue_cards.add(position.card_in_queue_for_blue)
             position.card_in_queue_for_blue = None
             position.active_player = 'red'
@@ -189,14 +225,69 @@ class Onitama(Game):
         """
         return repr(move)
 
-o = Onitama("3x4")
-starting_position = o.start()
-print(starting_position)
-moves = o.generate_moves(starting_position)
-print(moves)
-new_pos = o.do_move(starting_position, moves[0])
-print(new_pos.board)
-print(o.primitive(new_pos))
-print(new_pos)
-moves = o.generate_moves(new_pos)
-print(moves)
+    def hash_ext(self, position: OnitamaPosition) -> int:
+        card_list = ['dog', 'lobster', 'frog', 'toad', 'crab']
+        piece_lut = {'': 0, 'p': 1, 'm': 2, 'P': 3, 'M': 4}
+
+        # active player 1 bit
+        hash_val = 0
+        hash_val = hash_val * 2 + (0 if position.active_player == 'red' else 1)
+            
+        # which card in which hand? 3 * 5 bits
+        for card in card_list:
+            if card in position.red_cards:
+                val = 0
+            elif card in position.blue_cards:
+                val = 1
+            else:
+                val = 2
+            hash_val = hash_val * 3 + val
+                
+        # pieces on the board 5 * 9 bits
+        for row in position.board:
+            for piece in row:
+                hash_val = hash_val * 5 + piece_lut[piece]
+                
+        return hash_val
+
+    def unhash_ext(self, hash_val: int) -> OnitamaPosition:
+        card_list = ['dog', 'lobster', 'frog', 'toad', 'crab']
+        piece_lut = {0: '', 1: 'p', 2: 'm', 3: 'P', 4: 'M'}
+
+        # board
+        board_1d = []
+        for _ in range(9):
+            board_1d.append(piece_lut[hash_val % 5])
+            hash_val //= 5
+        board_1d.reverse()
+        board = [board_1d[0:3], board_1d[3:6], board_1d[6:9]]
+
+        # cards
+        red_cards = set()
+        blue_cards = set()
+        queued_card = None
+        
+        for card in reversed(card_list):
+            val = hash_val % 3
+            hash_val //= 3
+            if val == 0:
+                red_cards.add(card)
+            elif val == 1:
+                blue_cards.add(card)
+            else:
+                queued_card = card
+                
+        active_player = 'red' if (hash_val % 2) == 0 else 'blue'
+        
+        pos = OnitamaPosition(red_cards, blue_cards, board)
+
+        pos.active_player = active_player
+        # card in queue is for active player
+        if active_player == 'red':
+            pos.card_in_queue_for_red = queued_card
+            pos.card_in_queue_for_blue = None
+        else:
+            pos.card_in_queue_for_blue = queued_card
+            pos.card_in_queue_for_red = None
+            
+        return pos
