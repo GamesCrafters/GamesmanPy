@@ -147,12 +147,12 @@ class KaniNariEbi(Game):
         text = f"{self._square_name(src)}->{self._square_name(dest)}"
 
         if current == self._CURRENT_UP:
-            text += " current=up"
+            text += " u"
         elif current == self._CURRENT_DOWN:
-            text += " current=down"
+            text += " d"
 
         if promote:
-            text += " promote"
+            text += " p"
 
         return text
     
