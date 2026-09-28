@@ -35,12 +35,53 @@ STRING FORMATS
                          named chess-style: file letter a.. left to right, rank
                          number 1.. bottom to top.  Directions are wasd
                          (w north, a west, s south, d east).  A skip is '-'.
+    AUTOGUI              position '1_' (Red to move) or '2_' (Blue) + cells;
+                         move 'M_<source index>_<target index>_x', skip 'M_skip'.
+
+
+DATA REPRESENTATION
+    Cell         EMPTY = 0, RED = 1, BLUE = 2.
+
+    Board        A flat list of length rows * cols in row-major order, index 0
+                 at the top-left.  Row numbers grow downward, so index 0 is
+                 square a4 on 4x4 (not a1):
+
+                     index            square name
+                      0  1  2  3      a4 b4 c4 d4
+                      4  5  6  7      a3 b3 c3 d3
+                      8  9 10 11      a2 b2 c2 d2
+                     12 13 14 15      a1 b1 c1 d1
+
+                 get_coord(i) = (i // cols, i % cols);  get_index(r, c) =
+                 r * cols + c;  square_name gives file 'a' + col, rank
+                 rows - row.
+
+    Direction    UP = 0, RIGHT = 1, DOWN = 2, LEFT = 3 (clockwise).  One step
+                 changes the index by -cols, +1, +cols, -1 respectively.  The
+                 string letters follow WASD instead: UP 'w', LEFT 'a', DOWN 's',
+                 RIGHT 'd'.  `step` does no bounds checking, so directions
+                 always come from `neighbors`, which drops off-board ones.
+
+    Move         (source index << 2) | direction: the low two bits hold the
+                 direction, the rest the source square.  On 2x2, a2d (index 0,
+                 RIGHT) is 0b1 = 1 and b1a (index 3, LEFT) is 0b1111 = 15.  A
+                 skip is n_cells << 2, whose source index is off the board, so it
+                 cannot collide with a capture.
+
+    Position     (board as a base-3 number << 1) | side to move, where cell i
+                 has weight 3**i and the low bit is 0 for Red, 1 for Blue.  The
+                 2x2 start [RED, BLUE, BLUE, RED] with Red to move is
+                 (1 + 2*3 + 2*9 + 1*27) << 1 | 0 = 104.  The encoding space is
+                 2 * 3**n_cells, but only a small fraction is reachable (about
+                 520k positions on 4x4).
 """
 
 from models import Game, Value, StringMode
 from typing import Optional
 
 # --- cell contents ----------------------------------------------------------
+# One base-3 digit per cell in the position hash; RED and BLUE double as the
+# side-to-move values.  See DATA REPRESENTATION above.
 EMPTY, RED, BLUE = 0, 1, 2
 
 _CELL_TO_CHAR = {EMPTY: '-', RED: 'x', BLUE: 'o'}
@@ -51,8 +92,11 @@ _CELL_TO_GLYPH = {EMPTY: '.', RED: 'X', BLUE: 'O'}
 _PLAYER_NAME = {RED: 'Red (X)', BLUE: 'Blue (O)'}
 
 # --- move encoding ----------------------------------------------------------
-# A move is  (source_index << 2) | direction,  where direction is one of:
+# A move is  (source_index << 2) | direction,  where direction is one of the
+# values below, numbered clockwise.  Index delta per step: UP -cols, RIGHT +1,
+# DOWN +cols, LEFT -1.
 UP, RIGHT, DOWN, LEFT = 0b00, 0b01, 0b10, 0b11
+# Move strings use WASD letters, which are not in clockwise order.
 _DIR_TO_CHAR = {UP: 'w', LEFT: 'a', DOWN: 's', RIGHT: 'd'}
 
 SKIP_STRING = '-'
@@ -108,28 +152,27 @@ class Clusterfuss(Game):
                 after = board[:]
                 after[target] = player
                 after[index] = EMPTY
-                # Legal only if exactly one group holds the mover's checkers.
-                if sum(1 for group in self.groups(after)
-                       if any(after[i] == player for i in group)) == 1:
+                if self.is_legal(after, player):
                     moves.append((index << 2) | dir)
         return moves if moves else [self._skip_move]
 
     def do_move(self, position: int, move: int) -> int:
-       
+        """
+        Returns the position after `move`: the capture, then removal of any
+        enemy-only groups, then the turn passes.  A skip only passes the turn.
+        """
         (board, player) = self.unhash(position)
         if move != self._skip_move:
             (index, dir) = self.decode_move(move)
-            target = self.step(index, dir)
-            board[target] = player
+            board[self.step(index, dir)] = player
             board[index] = EMPTY
-            for group in self.groups(board):
-                if not any(board[i] == player for i in group):
-                    for i in group:
-                        board[i] = EMPTY
+            board = self.remove_enemy_only_groups(board, player)
         return self.hash(board, self.opponent(player))
 
     def primitive(self, position: int) -> Optional[Value]:
-        
+        """
+        The side to move loses once all of its checkers are gone.
+        """
         (board, player) = self.unhash(position)
         if player not in board:
             return Value.Loss
@@ -180,25 +223,28 @@ class Clusterfuss(Game):
         True if `board` (the position immediately after a capture, before any
         enemy-only group is removed) satisfies the move restriction: exactly one
         group contains checkers belonging to `player`.
-
-        TODO(core).
         """
-        pass
+        return sum(1 for group in self.groups(board)
+                   if any(board[i] == player for i in group)) == 1
 
     def remove_enemy_only_groups(self, board: list[int], player: int) -> list[int]:
         """
         Returns a copy of `board` with every group that contains no checker of
         `player` cleared, as required by ENEMY-ONLY GROUP REMOVAL.
-
-        TODO(core).
         """
-        pass
+        board = board[:]
+        for group in self.groups(board):
+            if not any(board[i] == player for i in group):
+                for i in group:
+                    board[i] = EMPTY
+        return board
 
     # ------------------------------------------------------------------
     # Board utilities
     # ------------------------------------------------------------------
     def groups(self, board: list[int]) -> list[list[int]]:
         """
+        Uses DFS.
         Returns the connected groups of `board` as lists of cell indices.
         Checkers of either colour connect; only orthogonal adjacency counts.
         """
@@ -284,20 +330,59 @@ class Clusterfuss(Game):
     # ------------------------------------------------------------------
     def hash(self, board: list[int], turn: int) -> int:
         """
-        Packs the board (base 3, one trit per cell) and the side to move (lowest
-        bit, 0 = Red) into a single integer.
+        Packs the board and the side to move into a single integer, one-to-one.
+
+        Idea: an integer can hold a row of digits, just as 352 holds 3, 5, 2
+        (3*10**2 + 5*10**1 + 2*10**0).  Each cell has exactly three states
+        (EMPTY 0, RED 1, BLUE 2), so we treat each cell as one base-3 digit,
+        with cell i weighted 3**i:
+
+            board value = board[0]*3**0 + board[1]*3**1 + ... + board[n-1]*3**(n-1)
+
+        Base-3 representations are unique, so different boards give different
+        values.  The side to move then goes in one extra base-2 digit at the
+        very bottom, making the result a mixed-radix number:
+
+            hash = board value * 2 + (0 if Red to move else 1)
+
+        so an even hash means Red to move, an odd one Blue.  `<< 1` and `|` are
+        just `* 2` and `+`.  Note the integer itself has no base; base 3 and
+        base 2 are only the two ways the code reads its digits.
+
+        Example, 2x2 start, board [RED, BLUE, BLUE, RED], Red to move:
+            board value = 1*1 + 2*3 + 2*9 + 1*27 = 52   (base 3: 1221)
+            hash        = 52 * 2 + 0            = 104
         """
+        # Horner's rule: start from the most significant digit (the last cell)
+        # and repeatedly shift everything up one base-3 place and add the next
+        # cell, e.g. 0 -> 1 -> 5 -> 17 -> 52 for the example above.  Iterating
+        # in reverse is what puts cell 0 in the lowest digit.
         position = 0
         for cell in reversed(board):
             position = position * 3 + cell
+        # Make room for one bit (* 2) and store the side to move in it.
         return (position << 1) | (0 if turn == RED else 1)
 
     def unhash(self, position: int) -> tuple[list[int], int]:
         """
         Inverse of `hash`: returns (board, side to move).
+
+        Peels digits off from the lowest end, in the reverse order `hash` put
+        them in: first the base-2 turn digit, then one base-3 digit per cell.
+        `% base` reads the lowest digit and `// base` drops it, just as
+        352 % 10 = 2 and 352 // 10 = 35 in decimal.
+
+        Example, 104:
+            104 & 1 = 0 -> Red to move;  104 >> 1 = 52
+            52 % 3 = 1, 52 // 3 = 17  -> board[0] = RED
+            17 % 3 = 2, 17 // 3 = 5   -> board[1] = BLUE
+             5 % 3 = 2,  5 // 3 = 1   -> board[2] = BLUE
+             1 % 3 = 1,  1 // 3 = 0   -> board[3] = RED
         """
+        # Lowest bit is the side to move (& 1 is % 2); >> 1 (// 2) drops it.
         turn = BLUE if position & 1 else RED
         position >>= 1
+        # Cells come out in index order because cell 0 is the lowest digit.
         board = []
         for _ in range(self._n_cells):
             board.append(position % 3)
