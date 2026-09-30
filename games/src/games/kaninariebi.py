@@ -762,7 +762,7 @@ class KaniNariEbi(Game):
 
         if mode == StringMode.TUI:
             rows = [str(abs(r + 1)) + " " + chars[r * 5:(r + 1) * 5] for r in range(0, 5)]
-            return "  a b c d e\n" + "\n".join(rows) + f"\nturn={turn}"
+            return "  a b c d e\n" + "\n".join(rows) + f"\nPlayer={turn}"
 
 
         if mode == StringMode.Readable:
