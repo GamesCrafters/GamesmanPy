@@ -3,7 +3,7 @@ from typing import Optional
 
 class KaniNariEbi(Game):
     id = 'kaninariebi'
-    variants = ["regular", "mixed"]
+    variants = ["regular", "mixed", "3x5"]
     n_players = 2
     cyclic = True
 
@@ -63,17 +63,14 @@ class KaniNariEbi(Game):
     # ========================================================
     # General Board Helpers
     # ========================================================
-    @staticmethod
-    def _index(row: int, col: int) -> int:
-        return row * 5 + col
+    def _index(self, row: int, col: int) -> int:
+        return row * self._COLS + col
 
-    @staticmethod
-    def _coord(index: int) -> tuple[int, int]:
-        return divmod(index, 5)
+    def _coord(self, index: int) -> tuple[int, int]:
+        return divmod(index, self._COLS)
 
-    @staticmethod
-    def _on_board(row: int, col: int) -> bool:
-        return 0 <= row < 5 and 0 <= col < 5
+    def _on_board(self, row: int, col: int) -> bool:
+        return 0 <= row < self._ROWS and 0 <= col < self._COLS
 
     def _owner(self, piece: int) -> int:
         if piece in (self._P1_CRAB, self._P1_SHRIMP):
@@ -94,11 +91,8 @@ class KaniNariEbi(Game):
     def _shrimp_piece(self, player: int) -> int:
         return self._P1_SHRIMP if player == 1 else self._P2_SHRIMP
 
-    @staticmethod
-    def _opponent_home_col(player: int) -> int:
-        # Player 1 starts on col 0 and promotes on col 4.
-        # Player 2 starts on col 4 and promotes on col 0.
-        return 4 if player == 1 else 0
+    def _opponent_home_col(self, player: int) -> int:
+        return self._COLS - 1 if player == 1 else 0
 
     # ===============================================================
     # Hashing / Unhashing Board
@@ -156,10 +150,8 @@ class KaniNariEbi(Game):
 
         return text
     
-    @staticmethod
-    def _square_name(square: int) -> str:
-        row, col = divmod(square, 5)
-        # Top row is rank 5, bottom row rank 1.
+    def _square_name(self, square: int) -> str:
+        row, col = self._coord(square)
         return f"{chr(ord('a') + col)}{row + 1}"
 
     # ========================================================================
@@ -300,17 +292,17 @@ class KaniNariEbi(Game):
     # ====================================================================
     # Primitive Helpers
     # ====================================================================    
-    def _has_three_shrimps(self, board: list[int], player: int) -> bool:
+    def _has_enough_shrimps(self, board: list[int], player: int) -> bool:
         shrimp = self._shrimp_piece(player)
-        return sum(piece == shrimp for piece in board) >= 3
+        return sum(piece == shrimp for piece in board) >= self._WIN_COUNT
 
-    def _captured_three(self, board: list[int], player: int) -> bool:
-        """Each player begins with 5 pieces and pieces never return."""
+    def _captured_enough(self, board: list[int], player: int) -> bool:
+        """Return whether the opponent has lost enough pieces to win."""
         opponent = 3 - player
         opponent_pieces_left = sum(
             self._owner(piece) == opponent for piece in board
         )
-        return opponent_pieces_left <= 2
+        return opponent_pieces_left <= self._INITIAL_PIECES - self._WIN_COUNT
 
     def _has_any_normal_move(self, board: list[int], player: int) -> bool:
         for src, piece in enumerate(board):
@@ -324,8 +316,8 @@ class KaniNariEbi(Game):
 
     def _wins_immediately(self, board: list[int], player: int) -> bool:
         return (
-            self._has_three_shrimps(board, player)
-            or self._captured_three(board, player)
+            self._has_enough_shrimps(board, player)
+            or self._captured_enough(board, player)
             or not self._has_any_normal_move(board, 3 - player)
         )
 
@@ -338,7 +330,9 @@ class KaniNariEbi(Game):
 
     def _chars_to_board(self, chars: str) -> list[int]:
         if len(chars) != self._BOARD_SIZE:
-            raise ValueError("Board string must contain exactly 25 squares")
+            raise ValueError(
+                f"Board string must contain exactly {self._BOARD_SIZE} squares"
+            )
 
         try:
             return [self._CHAR_TO_PIECE[c] for c in chars]
@@ -367,7 +361,7 @@ class KaniNariEbi(Game):
 
         # If movement initially stops in the middle column, player MUST choose
         # UP or DOWN. Both choices are legal even if one results in no movement.
-        if self._coord(dest)[1] == 2:
+        if self._coord(dest)[1] == self._CURRENT_COL:
             current_choices = (self._CURRENT_UP, self._CURRENT_DOWN)
         else:
             current_choices = (self._CURRENT_NONE,)
@@ -546,9 +540,12 @@ class KaniNariEbi(Game):
         if variant_id not in self.variants:
             raise ValueError("Variant not defined")
         self._variant_id = variant_id
-        
-
-        pass
+        self._ROWS = 3 if variant_id == "3x5" else 5
+        self._COLS = 5
+        self._BOARD_SIZE = self._ROWS * self._COLS
+        self._INITIAL_PIECES = self._ROWS
+        self._WIN_COUNT = 2 if variant_id == "3x5" else 3
+        self._CURRENT_COL = self._COLS // 2
 
     def start(self) -> int:
         """
@@ -558,10 +555,9 @@ class KaniNariEbi(Game):
 
         for row in range(self._ROWS):
             board[self._index(row, 0)] = self._P1_CRAB
-            board[self._index(row, 4)] = self._P2_CRAB
+            board[self._index(row, self._COLS - 1)] = self._P2_CRAB
 
-        return self._hash_position(board, 1)        
-        pass
+        return self._hash_position(board, 1)
     
     def generate_moves(self, position: int) -> list[int]:
         """
@@ -572,8 +568,8 @@ class KaniNariEbi(Game):
         # Do not generate moves from an already-finished position.
         previous_player = 3 - player
         if (
-            self._has_three_shrimps(board, previous_player)
-            or self._captured_three(board, previous_player)
+            self._has_enough_shrimps(board, previous_player)
+            or self._captured_enough(board, previous_player)
         ):
             return []
 
@@ -728,10 +724,10 @@ class KaniNariEbi(Game):
 
         # If the player who just moved reached either material win condition,
         # the current player is in a losing terminal position.
-        if self._has_three_shrimps(board, previous_player):
+        if self._has_enough_shrimps(board, previous_player):
             return Value.Loss
 
-        if self._captured_three(board, previous_player):
+        if self._captured_enough(board, previous_player):
             return Value.Loss
 
         # Third win condition: current player has no legal normal move.
@@ -753,8 +749,14 @@ class KaniNariEbi(Game):
             return f"{turn}_{chars}"
 
         if mode == StringMode.TUI:
-            rows = [str(abs(r + 1)) + " " + chars[r * 5:(r + 1) * 5] for r in range(0, 5)]
-            return "  abcde\n" + "\n".join(rows) + f"\nturn={turn}"
+            rows = [
+                f"{r + 1} " + chars[r * self._COLS:(r + 1) * self._COLS]
+                for r in range(self._ROWS)
+            ]
+            columns = "".join(
+                chr(ord("a") + col) for col in range(self._COLS)
+            )
+            return f"  {columns}\n" + "\n".join(rows) + f"\nturn={turn}"
 
 
         if mode == StringMode.Readable:
@@ -785,7 +787,7 @@ class KaniNariEbi(Game):
             turn = int(turn_str)
         except Exception as exc:
             raise ValueError(
-                "Readable position must have format '<25 board chars>|<turn>'"
+                f"Readable position must have format '<{self._BOARD_SIZE} board chars>|<turn>'"
             ) from exc
 
         if turn not in (1, 2):
