@@ -37,11 +37,11 @@ class KaniNariEbi(Game):
     )
 
     _PIECE_TO_CHAR = {
-        _EMPTY: "-",
-        _P1_CRAB: "C",
-        _P1_SHRIMP: "S",
-        _P2_CRAB: "c",
-        _P2_SHRIMP: "s",
+        _EMPTY: "口",
+        _P1_CRAB: "🦀",
+        _P1_SHRIMP: "🦞",
+        _P2_CRAB: "🦐",
+        _P2_SHRIMP: "🍤",
     }
     _CHAR_TO_PIECE = {v: k for k, v in _PIECE_TO_CHAR.items()}
     
