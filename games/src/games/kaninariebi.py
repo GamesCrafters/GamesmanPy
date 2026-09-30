@@ -334,7 +334,15 @@ class KaniNariEbi(Game):
     # =======================================================================================
 
     def _board_to_chars(self, board: list[int]) -> str:
-        return "".join(self._PIECE_TO_CHAR[piece] for piece in board)
+        chars = []
+
+        for i, piece in enumerate(board):
+            if i % 5 == 2 and piece == self._EMPTY:
+                chars.append("🌊")
+            else:
+                chars.append(self._PIECE_TO_CHAR[piece])
+
+        return "".join(chars)
 
     def _chars_to_board(self, chars: str) -> list[int]:
         if len(chars) != self._BOARD_SIZE:
