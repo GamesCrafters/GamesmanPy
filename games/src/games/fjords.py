@@ -123,7 +123,13 @@ class Fjords(Game):
         raise NotImplementedError("from_string() not implemented yet.")
 
     def move_to_string(self, move: int, mode: StringMode) -> str:
-        raise NotImplementedError("move_to_string() not implemented yet.")
+        m=0
+        for i in range(len(self._REGULAR_BOARD)):
+            if(self._REGULAR_BOARD[i][0]==0):
+                if(m==move):
+                    return str(i)
+                m+=1
+        #return str(move)
 
     # -- Position packing -------------------------------------------------
     # 2 bits per mutable vertex, digit 0 in the least-significant bits.
