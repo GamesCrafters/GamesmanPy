@@ -37,11 +37,11 @@ class KaniNariEbi(Game):
     )
 
     _PIECE_TO_CHAR = {
-        _EMPTY: "-",
-        _P1_CRAB: "C",
-        _P1_SHRIMP: "S",
-        _P2_CRAB: "c",
-        _P2_SHRIMP: "s",
+        _EMPTY: "口",
+        _P1_CRAB: "🦀",
+        _P1_SHRIMP: "🦞",
+        _P2_CRAB: "🦐",
+        _P2_SHRIMP: "🍤",
     }
     _CHAR_TO_PIECE = {v: k for k, v in _PIECE_TO_CHAR.items()}
     
@@ -326,7 +326,15 @@ class KaniNariEbi(Game):
     # =======================================================================================
 
     def _board_to_chars(self, board: list[int]) -> str:
-        return "".join(self._PIECE_TO_CHAR[piece] for piece in board)
+        chars = []
+
+        for i, piece in enumerate(board):
+            if i % 5 == 2 and piece == self._EMPTY:
+                chars.append("🌊")
+            else:
+                chars.append(self._PIECE_TO_CHAR[piece])
+
+        return "".join(chars)
 
     def _chars_to_board(self, chars: str) -> list[int]:
         if len(chars) != self._BOARD_SIZE:
@@ -757,7 +765,6 @@ class KaniNariEbi(Game):
                 chr(ord("a") + col) for col in range(self._COLS)
             )
             return f"  {columns}\n" + "\n".join(rows) + f"\nturn={turn}"
-
 
         if mode == StringMode.Readable:
             return f"{chars}|{turn}"
