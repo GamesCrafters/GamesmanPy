@@ -144,15 +144,15 @@ class KaniNariEbi(Game):
         # else:
         #     text += "0"
 
-        text = f"{self._square_name(src)}->{self._square_name(dest)}"
+        text = f"{self._square_name(src)}{self._square_name(dest)}"
 
         if current == self._CURRENT_UP:
-            text += " u"
+            text += "u"
         elif current == self._CURRENT_DOWN:
-            text += " d"
+            text += "d"
 
         if promote:
-            text += " p"
+            text += "p"
 
         return text
     
@@ -160,7 +160,7 @@ class KaniNariEbi(Game):
     def _square_name(square: int) -> str:
         row, col = divmod(square, 5)
         # Top row is rank 5, bottom row rank 1.
-        return f"{chr(ord('a') + col)}{5 - row}"
+        return f"{chr(ord('a') + col)}{row + 1}"
 
     # ========================================================================
     # Move encoding
@@ -753,7 +753,7 @@ class KaniNariEbi(Game):
             return f"{turn}_{chars}"
 
         if mode == StringMode.TUI:
-            rows = [str(abs(5 - r)) + " " + chars[r * 5:(r + 1) * 5] for r in range(5)]
+            rows = [str(abs(r + 1)) + " " + chars[r * 5:(r + 1) * 5] for r in range(4, -1, -1)]
             return "  abcde\n" + "\n".join(rows) + f"\nturn={turn}"
 
 
@@ -812,7 +812,7 @@ class KaniNariEbi(Game):
         text = self._part_to_string(main_part)
 
         if bond_part is not None:
-            text += " ; BOND " + self._part_to_string(bond_part)
+            text += "b-" + self._part_to_string(bond_part)
 
         return text
         pass
