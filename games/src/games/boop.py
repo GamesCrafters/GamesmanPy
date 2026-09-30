@@ -212,7 +212,9 @@ def can_still_make_kitten_line(board, player):
                     continue
                 cells = [board[cx][cy] for cx, cy in coords]
                 blocked = any(
-                    c is not None and not (c['player'] == player and c['kind'] == 'kitten')
+                    c is not None and not (
+                        c['player'] == player and c['kind'] == 'kitten'
+                    )
                     for c in cells
                 )
                 if not blocked:
@@ -323,7 +325,7 @@ def main():
         kind = choose_kind(supply, current)
         x, y = choose_position(board)
 
-        board[x][y] = make_piece(current, kind)
+        board[x][y] = make_piece(current, kind)  # type: ignore[assignment]
         supply[current][kind] -= 1
 
         resolve_boop(board, x, y, supply)
