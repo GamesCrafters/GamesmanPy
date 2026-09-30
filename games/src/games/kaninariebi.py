@@ -753,7 +753,7 @@ class KaniNariEbi(Game):
             return f"{turn}_{chars}"
 
         if mode == StringMode.TUI:
-            rows = [str(abs(r + 1)) + " " + chars[r * 5:(r + 1) * 5] for r in range(4, -1, -1)]
+            rows = [str(abs(r + 1)) + " " + chars[r * 5:(r + 1) * 5] for r in range(0, 5)]
             return "  abcde\n" + "\n".join(rows) + f"\nturn={turn}"
 
 
