@@ -103,9 +103,8 @@ SKIP_STRING = '-'
 class Clusterfuss(Game):
     id = 'clusterfuss'
     # Even by even only, so that both players start with the same number of
-    # checkers.  6x6 is listed for completeness; it is almost certainly too
-    # large to solve.
-    variants = ["2x2", "4x4", "6x6"]
+    # checkers.  6x6 is not listed here; it is too large for our Python solver.
+    variants = ["2x2", "4x4"]
     n_players = 2
     # Every capture removes at least one checker, so no position can repeat.
     cyclic = False
