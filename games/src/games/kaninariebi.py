@@ -1,6 +1,7 @@
 from models import Game, Value, StringMode
 from typing import Optional
 
+
 class KaniNariEbi(Game):
     id = 'kaninariebi'
     variants = ["regular", "mixed", "3x5"]
@@ -760,7 +761,8 @@ class KaniNariEbi(Game):
                 f"{r + 1} " + chars[r * self._COLS:(r + 1) * self._COLS]
                 for r in range(self._ROWS)
             ]
-            columns = "".join(
+
+            columns = " ".join(
                 chr(ord("a") + col) for col in range(self._COLS)
             )
             return f"  {columns}\n" + "\n".join(rows) + f"\nturn={turn}"
