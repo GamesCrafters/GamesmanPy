@@ -76,6 +76,8 @@ DATA REPRESENTATION
                  520k positions on 4x4).
 """
 
+import os
+import sys
 from models import Game, Value, StringMode
 from typing import Optional
 
@@ -86,10 +88,6 @@ EMPTY, RED, BLUE = 0, 1, 2
 
 _CELL_TO_CHAR = {EMPTY: '-', RED: 'x', BLUE: 'o'}
 _CHAR_TO_CELL = {'-': EMPTY, 'x': RED, 'o': BLUE}
-
-# Pretty glyphs used by the TUI only.
-_CELL_TO_GLYPH = {EMPTY: '.', RED: 'X', BLUE: 'O'}
-_PLAYER_NAME = {RED: 'Red (X)', BLUE: 'Blue (O)'}
 
 # --- move encoding ----------------------------------------------------------
 # A move is  (source_index << 2) | direction,  where direction is one of the
@@ -309,20 +307,76 @@ class Clusterfuss(Game):
 
     def board_to_tui(self, board: list[int], turn: int) -> str:
         """
-        Returns the human-facing board drawing used by the TUI.
+        Returns the human-facing board drawing used by the TUI: a box-drawn
+        grid with file letters and rank numbers, Red as a filled disc and Blue
+        as a hollow one.
+
+        Degrades on weaker terminals instead of breaking:
+          - If stdout's encoding cannot represent the Unicode glyphs (e.g. a
+            cp1252 Windows console or a redirected file), the board is drawn
+            in plain ASCII: +---+ borders, Red 'X', Blue 'O'.
+          - Colour is added only when stdout is a terminal, NO_COLOR is unset
+            and TERM is not 'dumb'.  On Windows, ANSI handling is switched on
+            in the console first; if that fails (pre-Windows 10), no colour.
+        The shapes alone always tell the sides apart.
         """
+        unicode_glyphs = '┌┬┐├┼┤└┴┘─│●○▶'
+        try:
+            unicode_glyphs.encode(sys.stdout.encoding or 'ascii')
+            fancy = True
+        except (UnicodeEncodeError, LookupError):
+            fancy = False
+
+        use_color = (sys.stdout.isatty()
+                     and 'NO_COLOR' not in os.environ
+                     and os.environ.get('TERM') != 'dumb')
+        if use_color and sys.platform == 'win32':
+            # Turn on ENABLE_VIRTUAL_TERMINAL_PROCESSING (0x0004) for stdout
+            # (handle -11) so the console interprets escape codes.
+            try:
+                import ctypes
+                kernel32 = ctypes.windll.kernel32
+                handle = kernel32.GetStdHandle(-11)
+                mode = ctypes.c_ulong()
+                use_color = bool(kernel32.GetConsoleMode(handle, ctypes.byref(mode))
+                                 and kernel32.SetConsoleMode(handle, mode.value | 0x0004))
+            except Exception:
+                use_color = False
+
+        def paint(text, code):
+            return f'\033[{code}m{text}\033[0m' if use_color else text
+
+        if fancy:
+            (red, blue, arrow) = ('●', '○', '▶')
+            (h, v) = ('─', '│')
+            (top, middle, bottom) = (('┌', '┬', '┐'),
+                                     ('├', '┼', '┤'),
+                                     ('└', '┴', '┘'))
+        else:
+            (red, blue, arrow) = ('X', 'O', '>')
+            (h, v) = ('-', '|')
+            top = middle = bottom = ('+', '+', '+')
+
+        glyph = {EMPTY: ' ', RED: paint(red, '1;91'), BLUE: paint(blue, '1;94')}
+        name = {RED: paint(f'{red} Red', '1;91'), BLUE: paint(f'{blue} Blue', '1;94')}
+
         width = len(str(self._rows))
         pad = ' ' * width
-        rule = f'{pad} +' + '-' * (2 * self._cols + 1) + '+'
-        lines = [rule]
+
+        def rule(corners):
+            (left, mid, right) = corners
+            return f'{pad} {left}' + mid.join(h * 3 for _ in range(self._cols)) + right
+
+        lines = [rule(top)]
         for r in range(self._rows):
-            cells = ' '.join(
-                _CELL_TO_GLYPH[board[self.get_index(r, c)]] for c in range(self._cols)
-            )
-            lines.append(f'{self._rows - r:>{width}} | {cells} |')
-        lines.append(rule)
-        lines.append(f'{pad}   ' + ' '.join(chr(ord('a') + c) for c in range(self._cols)))
-        lines.append(f'{pad} Turn: {_PLAYER_NAME[turn]}')
+            cells = f' {v} '.join(glyph[board[self.get_index(r, c)]]
+                                  for c in range(self._cols))
+            lines.append(f'{self._rows - r:>{width}} {v} {cells} {v}')
+            lines.append(rule(middle if r < self._rows - 1 else bottom))
+        lines.append(f'{pad}   ' + '   '.join(chr(ord('a') + c) for c in range(self._cols)))
+        lines.append('')
+        lines.append(f'{pad} {name[RED]} {board.count(RED)}   '
+                     f'{name[BLUE]} {board.count(BLUE)}   {arrow} {name[turn]} to move')
         return '\n'.join(lines)
 
     # ------------------------------------------------------------------
