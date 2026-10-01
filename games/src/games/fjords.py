@@ -46,6 +46,13 @@ class Fjords(Game):
         [0, [10, 20]], [2, [10, 11, 17, 20, 21]], [0, [16, 18, 22]], [0, [17, 19]], [0, [18, 23]],
         [0, [15, 16, 21]], [0, [16, 20, 22]], [1, [17, 21]], [2, [19, 24]], [0, [23]],
     ]
+    _BOARD_2 = [
+        [0, [6]], [1, [2]], [2, [1,3,7,8]], [0, [2,4,8,9]], [0,[3]],
+        [0,[6]], [0, [0,5,7]], [0,[2,6,8,12]], [0,[2,3,7,9,12,13]], [0,[3,13]],
+        [1,[11,16]], [0,[10,12,17]],[0,[7,8,11,17]],[0,[8,9,14,18]],[2,[13,19]],
+        [0,[20]],[0,[10,20,21]],[1,[11,12,18]],[2,[13,17,19,23]],[1,[14,18,23]],
+        [0,[15,16]],[0,[16,22]],[0,[21]],[2,[18,19,24]],[0,[23]]
+    ]
 
     def __init__(self, variant_id: str):
         if variant_id not in Fjords.variants:
@@ -53,12 +60,12 @@ class Fjords(Game):
         self._variant_id = variant_id
         self.b_width = 5
         self.b_length = 5
+        self.board=None
 
         if variant_id == "regular":
             self.board = [[color, list(neighbors)] for color, neighbors in self._REGULAR_BOARD]
         else:
-            self.board = self._generate_random_board(self.b_width, self.b_length, variant_id)
-
+            self.board = [[color, list(neighbors)] for color, neighbors in self._BOARD_2]
         self._mutable_indices = [
             i for i, (color, _) in enumerate(self.board) if color == self._UNCOLORED
         ]
@@ -124,8 +131,8 @@ class Fjords(Game):
 
     def move_to_string(self, move: int, mode: StringMode) -> str:
         m=0
-        for i in range(len(self._REGULAR_BOARD)):
-            if(self._REGULAR_BOARD[i][0]==0):
+        for i in range(len(self.board)):
+            if(self.board[i][0]==0):
                 if(m==move):
                     return str(i)
                 m+=1
