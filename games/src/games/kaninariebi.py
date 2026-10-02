@@ -822,7 +822,7 @@ class KaniNariEbi(Game):
         text = self._part_to_string(main_part)
 
         if bond_part is not None:
-            text += "-" + self._part_to_string(bond_part)
+            text += "b-" + self._part_to_string(bond_part)
 
         return text
         pass
