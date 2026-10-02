@@ -153,7 +153,7 @@ class KaniNariEbi(Game):
     
     def _square_name(self, square: int) -> str:
         row, col = self._coord(square)
-        return f"{chr(ord('a') + col)}{row + 1}"
+        return f"{chr(ord('a') + col)}{self._ROWS - row}"
 
     # ========================================================================
     # Move encoding
@@ -758,7 +758,7 @@ class KaniNariEbi(Game):
 
         if mode == StringMode.TUI:
             rows = [
-                f"{r + 1} " + chars[r * self._COLS:(r + 1) * self._COLS]
+                f"{self._ROWS - r} " + chars[r * self._COLS:(r + 1) * self._COLS]
                 for r in range(self._ROWS)
             ]
 
