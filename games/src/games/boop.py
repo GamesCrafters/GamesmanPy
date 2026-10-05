@@ -1,353 +1,501 @@
-"""
-Boop - text-based UI
-=====================
+"""Boop game adapter and text display. Copy into games/src/games/boop.py.
 
-Rules implemented (see https://en.boardgamearena.com/gamepanel?game=boop):
-  - 6x6 board. Each player starts with 8 Kittens in their supply (0 Cats).
-  - On your turn: place one piece (Kitten or Cat) from your supply onto any
-    empty cell.
-  - The placed piece "boops" (pushes) every adjacent piece one square away,
-    in all 8 directions, simultaneously:
-      * Cats can boop Kittens and Cats.
-      * Kittens can only boop Kittens (never Cats).
-      * A boop only happens if the destination square is empty.
-      * If a boop would push a piece off the board, it is removed from the
-        board and returned to its owner's supply.
-      * Only the piece just played does the booping - no chain reactions.
-  - After boops resolve, look for 3-in-a-row lines (horizontal, vertical,
-    diagonal) belonging to the player who just moved:
-      * A line of all Cats -> that player wins immediately.
-      * A line of Kittens (or a Kitten/Cat mix) -> the player removes that
-        line from the board and gains 3 Cats in their supply. If multiple
-        such lines exist, only ONE may be resolved this turn (player picks).
-  - If, after playing, all 8 of a player's pieces are on the board:
-      * If all 8 are Cats -> that player wins.
-      * Otherwise, if that player has no remaining way to ever form a
-        Kitten line (no line of 3 cells that's still open/theirs), one of
-        their pieces (their choice) is removed from the board and they
-        gain a single Cat in their supply instead.
-
-Run this file directly to play a two-player, same-terminal game:
-    python boop.py
+Variant: 4x4, five active pieces per player. Complete moves include any required graduation choice.
+render_options(position, lookup) accepts an optional database lookup taking an
+integer position and returning Value or None, from the next player's perspective.
+Without a lookup, only immediate terminal outcomes are known; others are unsolved.
+This module does not perform an exhaustive solve or define an AutoGUI layout.
 """
 
-import sys
+from typing import Callable, Optional
 
-SIZE = 6
-DIRECTIONS_8 = [(-1, -1), (-1, 0), (-1, 1),
-                (0, -1),           (0, 1),
-                (1, -1),  (1, 0),  (1, 1)]
-LINE_DIRECTIONS = [(1, 0), (0, 1), (1, 1), (1, -1)]
+from models import Game, Value, StringMode
 
 
-# ---------------------------------------------------------------------------
-# Board helpers
-# ---------------------------------------------------------------------------
+class Boop(Game):
+    id = "boop"
+    variants = ["4x4"]
+    n_players = 2
+    cyclic = True
+    uses_half_moves = False
+    SIZE = 4
+    PIECES = 5
+    CELLS = SIZE * SIZE
+    PLACEMENTS = 2 * CELLS
+    SUPPLY_BASE = PIECES + 1
+    HASH_TAG = (1 << 62) + (1 << 60)
+    POSITION_LIMIT = 5 ** CELLS * SUPPLY_BASE ** 4 * 2
+    # Empty, player 1 kitten/cat, player 2 kitten/cat.
+    SYMBOLS = ".kKlL"
+    LABELS = (" .", "K1", "C1", "K2", "C2")
+    DIRECTIONS = tuple((dx, dy) for dx in (-1, 0, 1)
+                       for dy in (-1, 0, 1) if dx or dy)
 
-def create_board():
-    return [[None for _ in range(SIZE)] for _ in range(SIZE)]
-
-
-def in_bounds(x, y):
-    return 0 <= x < SIZE and 0 <= y < SIZE
-
-
-def make_piece(player, kind):
-    return {'player': player, 'kind': kind}  # kind is 'kitten' or 'cat'
-
-
-def cell_str(cell):
-    if cell is None:
-        return " ."
-    letter = 'K' if cell['kind'] == 'cat' else 'k'
-    return f"{letter}{cell['player']}"
-
-
-def print_board(board):
-    header = "    " + "  ".join(f"{i}" for i in range(SIZE))
-    print(header)
-    for y in range(SIZE):
-        row = [cell_str(board[x][y]) for x in range(SIZE)]
-        print(f"{y:2}  " + "  ".join(row))
-    print()
-
-
-def print_supply(supply):
-    for p in (1, 2):
-        s = supply[p]
-        print(f"  Player {p} supply: {s['kitten']} kitten(s), {s['cat']} cat(s)")
-    print()
-
-
-def count_on_board(board, player):
-    return sum(1 for x in range(SIZE) for y in range(SIZE)
-               if board[x][y] and board[x][y]['player'] == player)
-
-
-def all_cats_on_board(board, player):
-    pieces = [board[x][y] for x in range(SIZE) for y in range(SIZE)
-              if board[x][y] and board[x][y]['player'] == player]
-    return len(pieces) > 0 and all(p['kind'] == 'cat' for p in pieces)
-
-
-# ---------------------------------------------------------------------------
-# Booping
-# ---------------------------------------------------------------------------
-
-def can_boop(booper, target):
-    if booper['kind'] == 'cat':
-        return True
-    return target['kind'] == 'kitten'
-
-
-def resolve_boop(board, x, y, supply):
-    """Boop everything adjacent to the piece just placed at (x, y)."""
-    booper = board[x][y]
-    candidates = []       # (from_x, from_y, to_x, to_y, piece)
-    moving_from = set()
-
-    for dx, dy in DIRECTIONS_8:
-        fx, fy = x + dx, y + dy
-        if not in_bounds(fx, fy):
-            continue
-        target = board[fx][fy]
-        if target is None or not can_boop(booper, target):
-            continue
-        tx, ty = fx + dx, fy + dy
-        candidates.append((fx, fy, tx, ty, target))
-        moving_from.add((fx, fy))
-
-    resolved = []
-    for fx, fy, tx, ty, piece in candidates:
-        if not in_bounds(tx, ty):
-            resolved.append((fx, fy, None, piece))          # falls off board
-        else:
-            occupant = board[tx][ty]
-            if occupant is None or (tx, ty) in moving_from:
-                resolved.append((fx, fy, (tx, ty), piece))   # can move
-            else:
-                resolved.append((fx, fy, 'blocked', piece))  # can't move
-
-    # Clear the source cells of everything that actually moves.
-    for fx, fy, dest, piece in resolved:
-        if dest != 'blocked':
-            board[fx][fy] = None
-
-    # Now place pieces at their destinations (or return them to supply).
-    for fx, fy, dest, piece in resolved:
-        if dest == 'blocked':
-            continue
-        if dest is None:
-            supply[piece['player']][piece['kind']] += 1
-            print(f"  -> a {piece['kind']} (Player {piece['player']}) was "
-                  f"booped off the board and returned to their supply!")
-        else:
-            tx, ty = dest
-            board[tx][ty] = piece
-
-
-# ---------------------------------------------------------------------------
-# Line detection / graduation
-# ---------------------------------------------------------------------------
-
-def find_lines(board, player):
-    """All 3-in-a-row lines fully owned by `player` (any mix of kind)."""
-    lines = []
-    for x in range(SIZE):
-        for y in range(SIZE):
-            for dx, dy in LINE_DIRECTIONS:
-                coords = [(x + dx * i, y + dy * i) for i in range(3)]
-                if not all(in_bounds(cx, cy) for cx, cy in coords):
+    def __init__(self, variant_id: str = "4x4"):
+        if variant_id not in self.variants:
+            raise ValueError("Variant not defined")
+        self._variant_id = variant_id
+        self._symmetry_weights = []
+        for reflected in (False, True):
+            for rotations in range(4):
+                weights = []
+                for square in range(self.CELLS):
+                    column, row = square % self.SIZE, square // self.SIZE
+                    if reflected:
+                        column = self.SIZE - 1 - column
+                    for _ in range(rotations):
+                        column, row = self.SIZE - 1 - row, column
+                    destination = row * self.SIZE + column
+                    weights.append(5 ** (self.CELLS - 1 - destination))
+                self._symmetry_weights.append(tuple(weights))
+        self._lines = []
+        for y in range(self.SIZE):
+            for x in range(self.SIZE):
+                for dx, dy in ((1, 0), (0, 1), (1, 1), (1, -1)):
+                    if 0 <= x + 2 * dx < self.SIZE and 0 <= y + 2 * dy < self.SIZE:
+                        self._lines.append(tuple((y + n * dy) * self.SIZE + x + n * dx
+                                                 for n in range(3)))
+        self._line_masks = tuple(sum(1 << square for square in line) for line in self._lines)
+        self._board_weights = tuple(5 ** (self.CELLS - 1 - square) for square in range(self.CELLS))
+        self._boop_targets = []
+        for square in range(self.CELLS):
+            column, row = square % self.SIZE, square // self.SIZE
+            targets = []
+            for dx, dy in self.DIRECTIONS:
+                adjacent_column, adjacent_row = column + dx, row + dy
+                if not (0 <= adjacent_column < self.SIZE and 0 <= adjacent_row < self.SIZE):
                     continue
-                cells = [board[cx][cy] for cx, cy in coords]
-                if all(c is not None and c['player'] == player for c in cells):
-                    lines.append(coords)
-    return lines
+                destination_column, destination_row = column + 2 * dx, row + 2 * dy
+                destination = (1 << (destination_row * self.SIZE + destination_column)
+                               if 0 <= destination_column < self.SIZE and 0 <= destination_row < self.SIZE
+                               else 0)
+                targets.append((1 << (adjacent_row * self.SIZE + adjacent_column), destination))
+            self._boop_targets.append(tuple(targets))
 
+    @staticmethod
+    def _owner(piece):
+        return (piece + 1) // 2
 
-def line_all_cats(board, coords):
-    return all(board[x][y]['kind'] == 'cat' for x, y in coords)
+    def _pack(self, board, supply, turn):
+        position = 0
+        for piece in board:
+            position = position * 5 + piece
+        for count in supply:
+            position = position * self.SUPPLY_BASE + count
+        return position * 2 + turn - 1
 
+    def _unpack(self, position):
+        if not isinstance(position, int) or position < 0:
+            raise ValueError("Position must be a nonnegative integer")
+        position, turn = divmod(position, 2)
+        supply = [0] * 4
+        for i in range(3, -1, -1):
+            position, supply[i] = divmod(position, self.SUPPLY_BASE)
+        board = [0] * self.CELLS
+        for i in range(self.CELLS - 1, -1, -1):
+            position, board[i] = divmod(position, 5)
+        if position:
+            raise ValueError("Position is too large")
+        for player in (1, 2):
+            if (sum(Boop._owner(p) == player for p in board)
+                    + sum(supply[(player - 1) * 2:player * 2]) != self.PIECES):
+                raise ValueError("Each player must have exactly fi`ve active pieces")
+        return board, supply, turn + 1
 
-def graduate_line(board, supply, player, coords):
-    for x, y in coords:
-        board[x][y] = None
-    supply[player]['cat'] += 3
+    def start(self) -> int:
+        return self._pack([0] * self.CELLS, [self.PIECES, 0, self.PIECES, 0], 1)
 
+    def hash_ext(self, position: int) -> int:
+        """Share a SQLite key across the eight square-board symmetries.
 
-def handle_graduation(board, supply, player):
-    """Returns 'win' if a Cat line was found, True if a line was graduated,
-    False if there was nothing to do."""
-    lines = find_lines(board, player)
-    if not lines:
-        return False
+        Supplies, piece types, owners, and turn are preserved. The live position
+        and displayed moves retain their original orientation. The tag separates
+        these keys from the previous database encoding; rebuild old databases.
+        """
+        board, supply, turn = self._unpack(position)
+        occupied = [(square, piece) for square, piece in enumerate(board) if piece]
+        payload = min(sum(piece * weights[square] for square, piece in occupied)
+                      for weights in self._symmetry_weights)
+        for amount in supply:
+            payload = payload * self.SUPPLY_BASE + amount
+        return self.HASH_TAG + payload * 2 + turn - 1
 
-    cat_lines = [l for l in lines if line_all_cats(board, l)]
-    if cat_lines:
-        return 'win'
+    def unhash_ext(self, hashed_pos: int) -> int:
+        """Return the canonical orientation, not necessarily the original one."""
+        if (not isinstance(hashed_pos, int)
+                or not self.HASH_TAG <= hashed_pos < self.HASH_TAG + self.POSITION_LIMIT):
+            raise ValueError("Not a symmetry-aware Boop database key")
+        position = hashed_pos - self.HASH_TAG
+        self._unpack(position)
+        if self.hash_ext(position) != hashed_pos:
+            raise ValueError("Database key is not in canonical orientation")
+        return position
 
-    if len(lines) > 1:
-        print(f"Player {player}, you have multiple 3-in-a-row groups. "
-              f"Choose which one to graduate into Cats:")
-        for i, l in enumerate(lines):
-            print(f"  {i + 1}: {l}")
-        choice = get_int_input("Choice: ", 1, len(lines)) - 1
-        chosen = lines[choice]
-    else:
-        chosen = lines[0]
-        print(f"Player {player} formed a 3-in-a-row! Graduating to Cats.")
+    def database_lookup(self, connection):
+        """Adapt this repository's SQLite rows to child-position Value lookups.
 
-    graduate_line(board, supply, player, chosen)
-    return True
+        The caller owns the connection. Missing rows remain UNSOLVED.
+        """
+        def lookup(position):
+            row = connection.execute(
+                "SELECT value FROM gamedb WHERE state = ?",
+                (self.hash_ext(position),),
+            ).fetchone()
+            return None if row is None else Value(row[0])
+        return lookup
 
+    def _wins(self, board, player):
+        cat = player * 2
+        return (board.count(cat) == self.PIECES
+                or any(all(board[i] == cat for i in line) for line in self._lines))
 
-def can_still_make_kitten_line(board, player):
-    """Is there still some 3-cell line with no opposing pieces in it, where
-    `player` could in principle end up with 3 Kittens?"""
-    for x in range(SIZE):
-        for y in range(SIZE):
-            for dx, dy in LINE_DIRECTIONS:
-                coords = [(x + dx * i, y + dy * i) for i in range(3)]
-                if not all(in_bounds(cx, cy) for cx, cy in coords):
-                    continue
-                cells = [board[cx][cy] for cx, cy in coords]
-                blocked = any(
-                    c is not None and not (
-                        c['player'] == player and c['kind'] == 'kitten'
-                    )
-                    for c in cells
-                )
-                if not blocked:
-                    return True
-    return False
+    def primitive(self, position: int) -> Optional[Value]:
+        board, _, turn = self._unpack(position)
+        # Every encoded move completes a turn, so a mover's win is a loss
+        # for the player to move. Check the previous player first.
+        if self._wins(board, 3 - turn):
+            return Value.Loss
+        if self._wins(board, turn):
+            return Value.Win
+        return None
 
+    def _place(self, board, supply, turn, square, kind):
+        board, supply = board.copy(), supply.copy()
+        piece = (turn - 1) * 2 + kind + 1
+        board[square] = piece
+        supply[piece - 1] -= 1
+        x, y = square % self.SIZE, square // self.SIZE
+        # Each destination is two squares from the placement, so it cannot
+        # be another adjacent piece's source. Snapshot checks suffice.
+        before = board.copy()
+        for dx, dy in self.DIRECTIONS:
+            fx, fy = x + dx, y + dy
+            if not (0 <= fx < self.SIZE and 0 <= fy < self.SIZE):
+                continue
+            source = fy * self.SIZE + fx
+            target = before[source]
+            if not target or (kind == 0 and target % 2 == 0):
+                continue
+            tx, ty = x + 2 * dx, y + 2 * dy
+            if not (0 <= tx < self.SIZE and 0 <= ty < self.SIZE):
+                board[source] = 0
+                supply[target - 1] += 1
+            elif before[ty * self.SIZE + tx] == 0:
+                board[source] = 0
+                board[ty * self.SIZE + tx] = target
+        return board, supply
 
-def force_convert(board, supply, player):
-    print(f"\nPlayer {player}: all 8 of your pieces are on the board and you "
-          f"can no longer form a Kitten line.")
-    print("Choose one of your pieces to remove from the board; you gain a "
-          "Cat in your supply instead.")
-    pieces = [(x, y) for x in range(SIZE) for y in range(SIZE)
-              if board[x][y] and board[x][y]['player'] == player]
-    for i, (x, y) in enumerate(pieces):
-        kind = board[x][y]['kind']
-        print(f"  {i + 1}: ({x},{y}) - {kind}")
-    choice = get_int_input("Choose piece to remove: ", 1, len(pieces)) - 1
-    x, y = pieces[choice]
-    board[x][y] = None
-    supply[player]['cat'] += 1
+    def _choices(self, board, turn):
+        if self._wins(board, turn) or self._wins(board, 3 - turn):
+            return [0]
+        # 0 = no graduation; 1..CELLS = single piece; CELLS+1 onward = line.
+        choices = [self.CELLS + 1 + n for n, line in enumerate(self._lines)
+                   if all(self._owner(board[i]) == turn for i in line)]
+        owned = [i for i, piece in enumerate(board) if self._owner(piece) == turn]
+        if len(owned) == self.PIECES:
+            choices.extend(i + 1 for i in owned)
+        return choices or [0]
 
+    def generate_moves(self, position: int) -> list[int]:
+        return [move for move, _ in self.generate_successors(position)]
 
-# ---------------------------------------------------------------------------
-# Input helpers
-# ---------------------------------------------------------------------------
+    def generate_successors(self, position: int):
+        """Generate successors using four bitboards, retaining the position encoding."""
+        board, supply, turn = self._unpack(position)
+        masks = [0, 0, 0, 0]
+        for square, piece in enumerate(board):
+            if piece:
+                masks[piece - 1] |= 1 << square
+        if self._cats_win_bits(masks[1]) or self._cats_win_bits(masks[3]):
+            return
+        occupied = masks[0] | masks[1] | masks[2] | masks[3]
+        empty = ((1 << self.CELLS) - 1) ^ occupied
+        owner_offset = (turn - 1) * 2
+        for kind in (0, 1):
+            piece_index = owner_offset + kind
+            if supply[piece_index] == 0:
+                continue
+            remaining = empty
+            while remaining:
+                placement = remaining & -remaining
+                remaining ^= placement
+                square = placement.bit_length() - 1
+                after, after_supply = masks.copy(), supply.copy()
+                after[piece_index] |= placement
+                after_supply[piece_index] -= 1
+                for source, destination in self._boop_targets[square]:
+                    if not occupied & source or occupied & destination:
+                        continue
+                    for target_index in range(4):
+                        if masks[target_index] & source:
+                            if kind == 0 and target_index % 2:
+                                break
+                            after[target_index] ^= source
+                            after[target_index] |= destination
+                            if destination == 0:
+                                after_supply[target_index] += 1
+                            break
+                for choice, removal in self._bit_choices(after, owner_offset):
+                    move = square + self.CELLS * kind + self.PLACEMENTS * choice
+                    child_masks, child_supply = after, after_supply
+                    if removal:
+                        child_masks, child_supply = after.copy(), after_supply.copy()
+                        child_masks[owner_offset] &= ~removal
+                        child_masks[owner_offset + 1] &= ~removal
+                        child_supply[owner_offset + 1] += removal.bit_count()
+                    yield move, self._pack_bits(child_masks, child_supply, 3 - turn)
 
-def get_int_input(prompt, lo, hi):
-    while True:
-        raw = input(prompt).strip()
+    def _cats_win_bits(self, cats):
+        return cats.bit_count() == self.PIECES or any(
+            cats & line == line for line in self._line_masks)
+
+    def _bit_choices(self, masks, owner_offset):
+        if self._cats_win_bits(masks[1]) or self._cats_win_bits(masks[3]):
+            return [(0, 0)]
+        owned = masks[owner_offset] | masks[owner_offset + 1]
+        choices = [(self.CELLS + 1 + index, line)
+                   for index, line in enumerate(self._line_masks) if owned & line == line]
+        if owned.bit_count() == self.PIECES:
+            while owned:
+                piece = owned & -owned
+                owned ^= piece
+                choices.append((piece.bit_length(), piece))
+        return choices or [(0, 0)]
+
+    def _pack_bits(self, masks, supply, turn):
+        position = 0
+        for piece, mask in enumerate(masks, 1):
+            while mask:
+                occupied = mask & -mask
+                mask ^= occupied
+                position += piece * self._board_weights[occupied.bit_length() - 1]
+        for count in supply:
+            position = position * self.SUPPLY_BASE + count
+        return position * 2 + turn - 1
+
+    def _finish_turn(self, board, supply, turn, choice):
+        if choice:
+            board, supply = board.copy(), supply.copy()
+            cells = (choice - 1,) if choice <= self.CELLS else self._lines[choice - self.CELLS - 1]
+            for cell in cells:
+                board[cell] = 0
+            supply[(turn - 1) * 2 + 1] += len(cells)
+        return self._pack(board, supply, 3 - turn)
+
+    def do_move(self, position: int, move: int) -> int:
+        if not isinstance(move, int) or move < 0:
+            raise ValueError("Invalid move")
+        if self.primitive(position) is not None:
+            raise ValueError("Game has already ended")
+        board, supply, turn = self._unpack(position)
+        choice, placement = divmod(move, self.PLACEMENTS)
+        kind, square = divmod(placement, self.CELLS)
+        if board[square] or not supply[(turn - 1) * 2 + kind]:
+            raise ValueError("Illegal placement")
+        board, supply = self._place(board, supply, turn, square, kind)
+        if choice not in self._choices(board, turn):
+            raise ValueError("Illegal graduation choice")
+        return self._finish_turn(board, supply, turn, choice)
+
+    def to_string(self, position: int, mode: StringMode) -> str:
+        board, supply, turn = self._unpack(position)
+        if mode == StringMode.Readable:
+            return f"{turn}|{''.join(self.SYMBOLS[p] for p in board)}|" + ",".join(map(str, supply))
+        if mode == StringMode.AUTOGUI:
+            raise NotImplementedError("Boop currently supports text display only")
+        if mode != StringMode.TUI:
+            raise ValueError("Unknown string mode")
+        border = "    +" + "---+" * self.SIZE
+        rows = ["Boop 4x4", f"TURN: Player {turn} (K{turn} / C{turn})",
+                "      A   B   C   D", border]
+        for y in reversed(range(self.SIZE)):
+            rows.append(f" {y + 1}  |" + "|".join(f"{self.LABELS[p]} " for p in board[y * self.SIZE:(y + 1) * self.SIZE]) + f"| {y + 1}")
+            rows.append(border)
+        rows += ["      A   B   C   D",
+                 "K = kitten; C = cat; number = owner; A1 is bottom left",
+                 f"Player 1 supply: {supply[0]} kittens, {supply[1]} cats",
+                 f"Player 2 supply: {supply[2]} kittens, {supply[3]} cats"]
+        return "\n".join(rows)
+
+    def from_string(self, strposition: str) -> int:
         try:
-            v = int(raw)
-        except ValueError:
-            print(f"Please enter a whole number between {lo} and {hi}.")
-            continue
-        if lo <= v <= hi:
-            return v
-        print(f"Please enter a number between {lo} and {hi}.")
+            player, cells, counts = strposition.strip().split("|")
+            turn = int(player)
+            board = [self.SYMBOLS.index(c) for c in cells]
+            supply = [int(c) for c in counts.split(",")]
+            if turn not in (1, 2) or len(board) != self.CELLS or len(supply) != 4:
+                raise ValueError()
+            if any(not 0 <= count <= self.PIECES for count in supply):
+                raise ValueError()
+            position = self._pack(board, supply, turn)
+            self._unpack(position)
+            return position
+        except (ValueError, TypeError) as error:
+            raise ValueError("Expected turn|16 board symbols (.kKlL)|p1k,p1c,p2k,p2c, with five pieces per player") from error
 
+    def move_to_string(self, move: int, mode: StringMode) -> str:
+        if mode == StringMode.AUTOGUI:
+            raise NotImplementedError("Boop currently supports text display only")
+        if mode not in (StringMode.Readable, StringMode.TUI):
+            raise ValueError("Unknown string mode")
+        if not isinstance(move, int) or move < 0:
+            raise ValueError("Invalid move")
+        choice, placement = divmod(move, self.PLACEMENTS)
+        kind, square = divmod(placement, self.CELLS)
+        # The displayed command is also accepted by move_from_string().
+        description = f"{'C' if kind else 'K'} {self._coordinate(square)}"
+        if 1 <= choice <= self.CELLS:
+            cell = choice - 1
+            description += f" / {self._coordinate(cell)}"
+        elif choice > self.CELLS:
+            if choice - self.CELLS - 1 >= len(self._lines):
+                raise ValueError("Invalid graduation code")
+            coords = " ".join(self._coordinate(i) for i in self._lines[choice - self.CELLS - 1])
+            description += f" / {coords}"
+        return description
 
-def choose_kind(supply, player):
-    s = supply[player]
-    if s['kitten'] > 0 and s['cat'] > 0:
-        while True:
-            c = input("Place a (k)itten or (c)at? ").strip().lower()
-            if c in ('k', 'kitten'):
-                return 'kitten'
-            if c in ('c', 'cat'):
-                return 'cat'
-            print("Please enter 'k' or 'c'.")
-    elif s['kitten'] > 0:
-        return 'kitten'
-    elif s['cat'] > 0:
-        return 'cat'
-    else:
-        raise RuntimeError(f"Player {player} has no pieces left to play - "
-                            f"this shouldn't happen.")
+    def _coordinate(self, square: int) -> str:
+        return f"{chr(ord('A') + square % self.SIZE)}{square // self.SIZE + 1}"
 
+    def _square(self, coordinate: str) -> int:
+        coordinate = coordinate.upper()
+        if (len(coordinate) != 2 or coordinate[0] not in "ABCD"
+                or coordinate[1] not in "1234"):
+            raise ValueError("Use a square from A1 to D4")
+        return (int(coordinate[1]) - 1) * self.SIZE + ord(coordinate[0]) - ord('A')
 
-def choose_position(board):
-    while True:
-        raw = input(f"Enter coordinates as 'x y' (each 0-{SIZE - 1}), "
-                     f"or 'quit': ").strip()
-        if raw.lower() in ('quit', 'exit'):
-            print("Thanks for playing!")
-            sys.exit(0)
-        parts = raw.split()
-        if len(parts) != 2:
-            print("Please enter two numbers separated by a space, e.g. '2 3'.")
-            continue
-        try:
-            x, y = int(parts[0]), int(parts[1])
-        except ValueError:
-            print("Coordinates must be integers.")
-            continue
-        if not in_bounds(x, y):
-            print(f"Coordinates must each be between 0 and {SIZE - 1}.")
-            continue
-        if board[x][y] is not None:
-            print("That cell is already occupied. Choose another.")
-            continue
-        return x, y
+    def move_from_string(self, position: int, text: str) -> int:
+        """Parse a displayed move number, 'k A1', or 'k C1 / A1 B1 C1'.
 
+        Move numbers are one-based indices into the current legal move list.
+        A bare square is accepted when only one piece type is legal there.
+        Graduation can be omitted only when the placement has one outcome.
+        """
+        text = text.strip().lower()
+        moves = self.generate_moves(position)
+        if text.isascii() and text.isdecimal():
+            number = int(text)
+            if not 1 <= number <= len(moves):
+                raise ValueError(f"Choose a move number from 1 to {len(moves)}" if moves
+                                 else "No legal moves: the game has ended")
+            return moves[number - 1]
+        parts = text.split("/")
+        if len(parts) > 2:
+            raise ValueError("Use k A1 or c A1, optionally / graduation squares")
+        placement = parts[0].split()
+        kind = None
+        if len(placement) == 2 and placement[0] in ("k", "kitten", "c", "cat"):
+            kind = int(placement[0] in ("c", "cat"))
+            square = self._square(placement[1])
+        elif len(placement) == 1:
+            square = self._square(placement[0])
+        else:
+            raise ValueError("Use k A1 for a kitten or c A1 for a cat")
+        graduation = None
+        if len(parts) == 2:
+            cells = [self._square(token) for token in parts[1].replace(",", " ").split()]
+            if len(cells) not in (1, 3) or len(set(cells)) != len(cells):
+                raise ValueError("Specify one or three distinct graduation squares after /")
+            graduation = set(cells)
+        matches = []
+        for move in moves:
+            choice, encoded = divmod(move, self.PLACEMENTS)
+            move_kind, move_square = divmod(encoded, self.CELLS)
+            if move_square != square or (kind is not None and kind != move_kind):
+                continue
+            cells = (set() if choice == 0 else {choice - 1} if choice <= self.CELLS
+                     else set(self._lines[choice - self.CELLS - 1]))
+            if graduation is None or graduation == cells:
+                matches.append(move)
+        if not matches:
+            raise ValueError("That move is not legal; choose a command from the displayed list")
+        if len(matches) != 1:
+            options = "; ".join(self.move_to_string(m, StringMode.TUI) for m in matches)
+            raise ValueError(f"Choose the piece type and graduation explicitly: {options}")
+        return matches[0]
 
-# ---------------------------------------------------------------------------
-# Main game loop
-# ---------------------------------------------------------------------------
+    def render_options(self, position: int,
+                       lookup: Optional[Callable[[int], Optional[Value]]] = None) -> str:
+        """Draw the board and all moves; lookup values are for child side to move.
 
-def other_player(p):
-    return 2 if p == 1 else 1
+        This helper is for a text caller. The framework will not automatically
+        call it; the standard methods above remain available to its own UI.
+        """
+        rows = [self.to_string(position, StringMode.TUI), ""]
+        terminal = self.primitive(position)
+        if terminal is not None:
+            rows.append(f"Game over: {terminal.name.lower()} for the player to move.")
+            return "\n".join(rows)
+        labels = {Value.Loss: "WIN", Value.Win: "LOSS",
+                  Value.Tie: "TIE", Value.Draw: "DRAW"}
+        rows.append("Legal moves - outcomes for the player choosing the move:")
+        rows.append("Enter a listed move number (e.g. 7) or a square (e.g. A1).")
+        rows.append("Use K A1 (kitten) or C A1 (cat) to specify the piece; / marks graduation squares.")
+        for number, (move, child) in enumerate(self.generate_successors(position), 1):
+            value = self.primitive(child)
+            immediate = value is not None
+            if value is None and lookup is not None:
+                value = lookup(child)
+                if value is not None and not isinstance(value, Value):
+                    raise TypeError("lookup must return Value or None")
+            label = "UNSOLVED" if value is None else labels[value]
+            if immediate:
+                label += " (immediate)"
+            rows.append(f"{number:3}. [{label}] {self.move_to_string(move, StringMode.TUI)}")
+        return "\n".join(rows)
 
 
 def main():
-    board = create_board()
-    supply = {1: {'kitten': 8, 'cat': 0}, 2: {'kitten': 8, 'cat': 0}}
-    current = 1
+    import argparse
+    import importlib.util
+    from pathlib import Path
+    import sqlite3
 
-    print("=" * 40)
-    print("Welcome to Boop!")
-    print("Legend: k1/K1 = Player 1 kitten/cat, k2/K2 = Player 2 kitten/cat")
-    print("=" * 40, "\n")
-
-    while True:
-        print_board(board)
-        print_supply(supply)
-        print(f"--- Player {current}'s turn ---")
-
-        kind = choose_kind(supply, current)
-        x, y = choose_position(board)
-
-        board[x][y] = make_piece(current, kind)  # type: ignore[assignment]
-        supply[current][kind] -= 1
-
-        resolve_boop(board, x, y, supply)
-
-        result = handle_graduation(board, supply, current)
-        if result == 'win':
-            print_board(board)
-            print(f"*** Player {current} wins with a line of 3 Cats! ***")
-            return
-
-        board_count = count_on_board(board, current)
-        supply_empty = supply[current]['kitten'] == 0 and supply[current]['cat'] == 0
-        if supply_empty and board_count == 8:
-            if all_cats_on_board(board, current):
-                print_board(board)
-                print(f"*** Player {current} wins - all 8 pieces are Cats "
-                      f"on the board! ***")
-                return
-            if not can_still_make_kitten_line(board, current):
-                force_convert(board, supply, current)
-
-        current = other_player(current)
+    parser = argparse.ArgumentParser(description="Play 4x4 Boop with saved solver values")
+    parser.add_argument("--db", type=Path, help="Path to the solved boop_4x4.db")
+    args = parser.parse_args()
+    game = Boop("4x4")
+    position = game.start()
+    path = args.db
+    if path is None:
+        spec = importlib.util.find_spec("database")
+        if spec is not None and spec.origin:
+            path = Path(spec.origin).resolve().parents[2] / "db" / "boop_4x4.db"
+    connection = lookup = None
+    if path is not None and path.is_file():
+        try:
+            connection = sqlite3.connect(path.resolve().as_uri() + "?mode=ro", uri=True)
+            lookup = game.database_lookup(connection)
+            if lookup(position) is None:
+                print("Database is incomplete or uses an older encoding; missing results show UNSOLVED.")
+            else:
+                print(f"Reading solution values from {path}")
+        except (sqlite3.Error, ValueError) as error:
+            print(f"Cannot read solution database: {error}")
+            if connection is not None:
+                connection.close()
+            connection = lookup = None
+    else:
+        print("No solution database found; nonterminal moves show UNSOLVED.")
+    try:
+        while True:
+            print(game.render_options(position, lookup))
+            if game.primitive(position) is not None:
+                break
+            _, _, turn = game._unpack(position)
+            try:
+                raw = input(f"Player {turn}, enter move number or coordinates (7, A1, K B2, C C3), or q: ").strip()
+            except (EOFError, KeyboardInterrupt):
+                break
+            if raw.lower() in ("q", "quit", "exit"):
+                break
+            try:
+                position = game.do_move(position, game.move_from_string(position, raw))
+            except ValueError as error:
+                print(error)
+    finally:
+        if connection is not None:
+            connection.close()
 
 
 if __name__ == "__main__":
