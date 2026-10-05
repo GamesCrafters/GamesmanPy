@@ -765,7 +765,7 @@ class KaniNariEbi(Game):
             columns = " ".join(
                 chr(ord("a") + col) for col in range(self._COLS)
             )
-            return f"  {columns}\n" + "\n".join(rows) + f"\nturn={turn}"
+            return f"  {columns}\n" + "\n".join(rows) + f"\nPlayer:{list(self._PIECE_TO_CHAR.values())[(turn*2)-1]}"
 
         if mode == StringMode.Readable:
             return f"{chars}|{turn}"
@@ -822,7 +822,7 @@ class KaniNariEbi(Game):
         text = self._part_to_string(main_part)
 
         if bond_part is not None:
-            text += "b-" + self._part_to_string(bond_part)
+            text += "-" + self._part_to_string(bond_part)
 
         return text
         pass
