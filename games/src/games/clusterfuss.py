@@ -80,6 +80,7 @@ DATA REPRESENTATION
 
 import os
 import sys
+from enum import IntEnum
 from models import Game, Value, StringMode
 from typing import Optional
 
@@ -95,11 +96,29 @@ _CHAR_TO_CELL = {'-': EMPTY, 'x': RED, 'o': BLUE}
 # A move is  (source_index << 2) | direction,  where direction is one of the
 # values below, numbered clockwise.  Index delta per step: UP -cols, RIGHT +1,
 # DOWN +cols, LEFT -1.
-UP, RIGHT, DOWN, LEFT = 0b00, 0b01, 0b10, 0b11
+class Direction(IntEnum):
+    UP = 0b00
+    RIGHT = 0b01
+    DOWN = 0b10
+    LEFT = 0b11
+
+
+# Short aliases.  `match` needs the dotted Direction.X form in its cases, since a
+# bare name there would capture instead of compare.
+UP, RIGHT, DOWN, LEFT = (Direction.UP, Direction.RIGHT,
+                         Direction.DOWN, Direction.LEFT)
 # Move strings use the letters u/r/d/l.
-_DIR_TO_CHAR = {UP: 'u', RIGHT: 'r', DOWN: 'd', LEFT: 'l'}
+_DIR_TO_CHAR: dict[int, str] = {UP: 'u', RIGHT: 'r', DOWN: 'd', LEFT: 'l'}
 
 SKIP_STRING = '-'
+
+
+def _paint(text: str, code: str, use_color: bool) -> str:
+    """
+    Wraps `text` in the ANSI SGR escape `code` (e.g. '1;91' bold bright red)
+    when `use_color` is set; otherwise returns `text` unchanged.
+    """
+    return f'\033[{code}m{text}\033[0m' if use_color else text
 
 
 class Clusterfuss(Game):
@@ -136,17 +155,29 @@ class Clusterfuss(Game):
         (board, player) = self.unhash(position)
         if player not in board:
             return []
+        own_groups = [group for group in self.groups(board)
+                      if any(board[i] == player for i in group)]
+        # A capture stays inside its own group, so if two groups hold the
+        # mover's checkers, both still do after any move: nothing is legal.
+        if len(own_groups) != 1:
+            return [self._skip_move]
+        (pre, pieces) = self.removal_pieces(board, player, own_groups[0][0])
         moves = []
         for index in range(self._n_cells):
             if board[index] != player:
                 continue
+            parts = pieces[index]
+            own_parts = [part for part in parts if part[2] > 0]
+            if len(own_parts) > 1:
+                continue
             for (dir, target) in self.neighbors(index):
                 if board[target] == EMPTY:
                     continue
-                after = board[:]
-                after[target] = player
-                after[index] = EMPTY
-                if self.is_legal(after, player):
+                # The capturing checker lands in target's piece, so the move is
+                # legal unless some other piece still holds a mover's checker.
+                home = next(part for part in parts
+                            if part[0] <= pre[target] < part[1])
+                if not own_parts or own_parts[0] == home:
                     moves.append((index << 2) | dir)
         return moves if moves else [self._skip_move]
 
@@ -212,14 +243,63 @@ class Clusterfuss(Game):
     # ------------------------------------------------------------------
     # Rules helpers (core logic)
     # ------------------------------------------------------------------
-    def is_legal(self, board: list[int], player: int) -> bool:
+    def removal_pieces(self, board: list[int], player: int,
+                       root: int) -> tuple[list[int], dict[int, list[tuple[int, int, int]]]]:
         """
-        True if `board` (the position immediately after a capture, before any
-        enemy-only group is removed) satisfies the move restriction: exactly one
-        group contains checkers belonging to `player`.
+        Uses Tarjan's articulation-point DFS over the group containing `root`.
+        One clock ticks on both entering and leaving a cell, so pre[i] and
+        post[i] are cell i's pre and post numbers, and u lies in w's subtree
+        exactly when pre[w] <= pre[u] < post[w].
+        Returns (pre, pieces):  pieces[i] lists the pieces the group splits into
+        when checker i is removed, each as (first, end, own): the cells whose
+        pre number lies in [first, end), and how many of them are `player`'s.
+        The piece still attached to i's DFS parent comes last with the range
+        covering the whole group, so the first range containing a cell names
+        that cell's piece.
+        A capture leaves its source square empty and its target occupied, so
+        legality only depends on how the group falls apart without the source.
         """
-        return sum(1 for group in self.groups(board)
-                   if any(board[i] == player for i in group)) == 1
+        pre = [-1] * self._n_cells
+        post = [-1] * self._n_cells
+        low = [0] * self._n_cells
+        own = [0] * self._n_cells
+        splits = {}
+        clock = 0
+
+        def visit(v: int, parent: Optional[int]) -> None:
+            nonlocal clock
+            pre[v] = low[v] = clock
+            clock += 1
+            own[v] = int(board[v] == player)
+            cut_off, joined = [], 0
+            for (_, w) in self.neighbors(v):
+                if board[w] == EMPTY or w == parent:
+                    continue
+                if pre[w] == -1:
+                    visit(w, v)
+                    own[v] += own[w]
+                    low[v] = min(low[v], low[w])
+                    # w's subtree breaks off from v's parent unless a back edge
+                    # from it climbs above v.  The root has no parent side, so
+                    # each of its subtrees is its own piece.
+                    if parent is None or low[w] >= pre[v]:
+                        cut_off.append((pre[w], post[w], own[w]))
+                    else:
+                        joined += own[w]
+                else:
+                    low[v] = min(low[v], pre[w])
+            post[v] = clock
+            clock += 1
+            splits[v] = (cut_off, joined, parent is None)
+
+        visit(root, None)
+        pieces = {}
+        for (v, (cut_off, joined, is_root)) in splits.items():
+            pieces[v] = cut_off
+            if not is_root:
+                rest = own[root] - own[v] + joined
+                pieces[v] = cut_off + [(0, post[root] + 1, rest)]
+        return (pre, pieces)
 
     def remove_enemy_only_groups(self, board: list[int], player: int) -> list[int]:
         """
@@ -280,14 +360,19 @@ class Clusterfuss(Game):
         """
         Returns the index one square from `index` in `dir`.  Assumes the step
         stays on the board; callers get their directions from `neighbors`.
+        Raises ValueError if `dir` is not a direction.
         """
-        if dir == UP:
-            return index - self._cols
-        if dir == RIGHT:
-            return index + 1
-        if dir == DOWN:
-            return index + self._cols
-        return index - 1
+        match dir:
+            case Direction.UP:
+                return index - self._cols
+            case Direction.RIGHT:
+                return index + 1
+            case Direction.DOWN:
+                return index + self._cols
+            case Direction.LEFT:
+                return index - 1
+            case _:
+                raise ValueError(f"Invalid direction: {dir}")
 
     def start_board(self) -> list[int]:
         """
@@ -354,9 +439,6 @@ class Clusterfuss(Game):
             except Exception:
                 use_color = False
 
-        def paint(text, code):
-            return f'\033[{code}m{text}\033[0m' if use_color else text
-
         if fancy:
             (red, blue, arrow) = ('●', '○', '▶')
             (h, v) = ('─', '│')
@@ -368,8 +450,11 @@ class Clusterfuss(Game):
             (h, v) = ('-', '|')
             top = middle = bottom = ('+', '+', '+')
 
-        glyph = {EMPTY: ' ', RED: paint(red, '1;91'), BLUE: paint(blue, '1;94')}
-        name = {RED: paint(f'{red} Red', '1;91'), BLUE: paint(f'{blue} Blue', '1;94')}
+        glyph = {EMPTY: ' ',
+                 RED: _paint(red, '1;91', use_color),
+                 BLUE: _paint(blue, '1;94', use_color)}
+        name = {RED: _paint(f'{red} Red', '1;91', use_color),
+                BLUE: _paint(f'{blue} Blue', '1;94', use_color)}
 
         width = len(str(self._rows))
         pad = ' ' * width
