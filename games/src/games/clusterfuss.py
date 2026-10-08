@@ -1,8 +1,10 @@
 """
 Clusterfuss, by Mark Steere (July 2023).  https://marksteeregames.com
 
-Two players, Red and Blue, on an N x N board initially filled with checkers in
-a checkerboard pattern.  Red moves first.
+Two players, Red and Blue, on a rows x cols board initially filled with
+checkers in a checkerboard pattern.  On an odd x odd board the centre square is
+left empty, so both sides start with the same number of checkers.  Red moves
+first.
 
 MOVES        Every move is an orthogonal king capture: you move one of your own
              checkers one square up/down/left/right onto an occupied square,
@@ -31,10 +33,10 @@ STRING FORMATS
     Position (Readable)  side to move, then the board in row-major order from
                          the top-left square:  'x' Red, 'o' Blue, '-' empty.
                          e.g. 4x4 start -> 'xxoxooxoxxoxooxox'
-    Move                 source square + direction, e.g. 'c4w'.  Squares are
+    Move                 source square + direction, e.g. 'c4u'.  Squares are
                          named chess-style: file letter a.. left to right, rank
-                         number 1.. bottom to top.  Directions are wasd
-                         (w north, a west, s south, d east).  A skip is '-'.
+                         number 1.. bottom to top.  Directions are udlr
+                         (u up, d down, l left, r right).  A skip is '-'.
     AUTOGUI              position '1_' (Red to move) or '2_' (Blue) + cells;
                          move 'M_<source index>_<target index>_x', skip 'M_skip'.
 
@@ -58,13 +60,13 @@ DATA REPRESENTATION
 
     Direction    UP = 0, RIGHT = 1, DOWN = 2, LEFT = 3 (clockwise).  One step
                  changes the index by -cols, +1, +cols, -1 respectively.  The
-                 string letters follow WASD instead: UP 'w', LEFT 'a', DOWN 's',
-                 RIGHT 'd'.  `step` does no bounds checking, so directions
-                 always come from `neighbors`, which drops off-board ones.
+                 string letters are UP 'u', RIGHT 'r', DOWN 'd', LEFT 'l'.  `step`
+                 does no bounds checking, so directions always come from
+                 `neighbors`, which drops off-board ones.
 
     Move         (source index << 2) | direction: the low two bits hold the
-                 direction, the rest the source square.  On 2x2, a2d (index 0,
-                 RIGHT) is 0b1 = 1 and b1a (index 3, LEFT) is 0b1111 = 15.  A
+                 direction, the rest the source square.  On 2x2, a2r (index 0,
+                 RIGHT) is 0b1 = 1 and b1l (index 3, LEFT) is 0b1111 = 15.  A
                  skip is n_cells << 2, whose source index is off the board, so it
                  cannot collide with a capture.
 
@@ -94,17 +96,17 @@ _CHAR_TO_CELL = {'-': EMPTY, 'x': RED, 'o': BLUE}
 # values below, numbered clockwise.  Index delta per step: UP -cols, RIGHT +1,
 # DOWN +cols, LEFT -1.
 UP, RIGHT, DOWN, LEFT = 0b00, 0b01, 0b10, 0b11
-# Move strings use WASD letters, which are not in clockwise order.
-_DIR_TO_CHAR = {UP: 'w', LEFT: 'a', DOWN: 's', RIGHT: 'd'}
+# Move strings use the letters u/r/d/l.
+_DIR_TO_CHAR = {UP: 'u', RIGHT: 'r', DOWN: 'd', LEFT: 'l'}
 
 SKIP_STRING = '-'
 
 
 class Clusterfuss(Game):
     id = 'clusterfuss'
-    # Even by even only, so that both players start with the same number of
+    # 3x3 leaves its centre empty so both players start with the same number of
     # checkers.  6x6 is not listed here; it is too large for our Python solver.
-    variants = ["2x2", "4x4"]
+    variants = ["2x2", "2x3", "3x3", "4x4", "4x5"]
     n_players = 2
     # Every capture removes at least one checker, so no position can repeat.
     cyclic = False
@@ -125,15 +127,10 @@ class Clusterfuss(Game):
     # ------------------------------------------------------------------
     def start(self) -> int:
         """
-        Returns the starting position of the game: a full checkerboard with Red
-        on every square where (row + col) is even, and Red to move.
+        Returns the starting position of the game: the start board with Red to
+        move.
         """
-        board = [
-            RED if (r + c) % 2 == 0 else BLUE
-            for r in range(self._rows)
-            for c in range(self._cols)
-        ]
-        return self.hash(board, RED)
+        return self.hash(self.start_board(), RED)
 
     def generate_moves(self, position: int) -> list[int]:
         (board, player) = self.unhash(position)
@@ -291,6 +288,21 @@ class Clusterfuss(Game):
         if dir == DOWN:
             return index + self._cols
         return index - 1
+
+    def start_board(self) -> list[int]:
+        """
+        Returns the start board: a checkerboard with Red on every square where
+        (row + col) is even, and on an odd board the centre square left empty
+        so both sides have the same number of checkers.
+        """
+        board = [
+            RED if (r + c) % 2 == 0 else BLUE
+            for r in range(self._rows)
+            for c in range(self._cols)
+        ]
+        if self._n_cells % 2 == 1:
+            board[self._n_cells // 2] = EMPTY
+        return board
 
     def opponent(self, player: int) -> int:
         return BLUE if player == RED else RED
