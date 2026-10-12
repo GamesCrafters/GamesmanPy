@@ -4,7 +4,7 @@ from typing import Optional
 
 class KaniNariEbi(Game):
     id = 'kaninariebi'
-    variants = ["regular", "mixed", "3x5"]
+    variants = ["regular", "mixed", "3x5", "5x3"]
     n_players = 2
     cyclic = True
 
@@ -271,7 +271,7 @@ class KaniNariEbi(Game):
     ) -> int:
         row, col = self._coord(src)
 
-        if col != 2 or current == self._CURRENT_NONE:
+        if col != self._CURRENT_COL or current == self._CURRENT_NONE:
             return src
 
         if current == self._CURRENT_UP:
@@ -328,9 +328,9 @@ class KaniNariEbi(Game):
 
     def _board_to_chars(self, board: list[int]) -> str:
         chars = []
-
+        
         for i, piece in enumerate(board):
-            if i % 5 == 2 and piece == self._EMPTY:
+            if i % self._COLS == self._CURRENT_COL and piece == self._EMPTY:
                 chars.append("🌊")
             else:
                 chars.append(self._PIECE_TO_CHAR[piece])
@@ -549,7 +549,7 @@ class KaniNariEbi(Game):
             raise ValueError("Variant not defined")
         self._variant_id = variant_id
         self._ROWS = 3 if variant_id == "3x5" else 5
-        self._COLS = 5
+        self._COLS = 3 if variant_id == "5x3" else 5
         self._BOARD_SIZE = self._ROWS * self._COLS
         self._INITIAL_PIECES = self._ROWS
         self._WIN_COUNT = 2 if variant_id == "3x5" else 3
