@@ -45,6 +45,20 @@ class KaniNariEbi(Game):
         _P2_SHRIMP: "🍤",
     }
     _CHAR_TO_PIECE = {v: k for k, v in _PIECE_TO_CHAR.items()}
+
+        # Web / AutoGUI board representation
+    _WEB_PIECE_TO_CHAR = {
+        _EMPTY: "-",
+        _P1_CRAB: "C",
+        _P1_SHRIMP: "S",
+        _P2_CRAB: "c",
+        _P2_SHRIMP: "s",
+    }
+
+    _WEB_CHAR_TO_PIECE = {
+        char: piece
+        for piece, char in _WEB_PIECE_TO_CHAR.items()
+    }
     
     # ---------------------------- Move bit layout ----------------------------
     # One part-move uses 13 bits:
@@ -751,73 +765,87 @@ class KaniNariEbi(Game):
         Returns a string representation of the position based on the given mode.
         """
         board, turn = self._unhash_position(position)
-        chars = self._board_to_chars(board)
 
-        if mode == StringMode.AUTOGUI:
+        if mode in (StringMode.AUTOGUI, StringMode.Readable):
+            chars = "".join(
+                self._WEB_PIECE_TO_CHAR[piece]
+                for piece in board
+            )
             return f"{turn}_{chars}"
 
         if mode == StringMode.TUI:
+            chars = self._board_to_chars(board)
+
             rows = [
-                f"{self._ROWS - r} " + chars[r * self._COLS:(r + 1) * self._COLS]
+                f"{self._ROWS - r} " +
+                chars[r * self._COLS:(r + 1) * self._COLS]
                 for r in range(self._ROWS)
             ]
 
             columns = " ".join(
-                chr(ord("a") + col) for col in range(self._COLS)
+                chr(ord("a") + col)
+                for col in range(self._COLS)
             )
-            return f"  {columns}\n" + "\n".join(rows) + f"\nPlayer:{list(self._PIECE_TO_CHAR.values())[(turn*2)-1]}"
 
-        if mode == StringMode.Readable:
-            return f"{chars}|{turn}"
+            return (
+                f"  {columns}\n"
+                + "\n".join(rows)
+                + f"\nPlayer:{list(self._PIECE_TO_CHAR.values())[(turn * 2) - 1]}"
+            )
+
+        raise ValueError("Unsupported StringMode")
 
     # unhash String board representation to the actual position
     def from_string(self, strposition: str) -> int:
         """
-        Returns the position from a string representation of the position.
-        Input string is StringMode.Readable.
+        Converts a string position into an integer position.
+
+        Format: <turn>_<board>
+        Example: 1_C---cC---cC---cC---cC---c
         """
-        # src, dest, current, promote = self._unpack_part(part_code)
-
-        # text = f"{self._square_name(src)}->{self._square_name(dest)}"
-
-        # if current == self._CURRENT_UP:
-        #     text += " current = up"
-        # elif current == self._CURRENT_DOWN:
-        #     text += " current = down"
-
-        # if promote:
-        #     text += " promote"
-
-        # return text
-
         try:
-            chars, turn_str = strposition.split("|")
-            turn = int(turn_str)
-        except Exception as exc:
+            turn_str, chars = strposition.strip().split("_", 1)
+        except ValueError as exc:
             raise ValueError(
-                f"Readable position must have format '<{self._BOARD_SIZE} board chars>|<turn>'"
+                "Position must have format '<turn>_<board>'"
             ) from exc
 
-        if turn not in (1, 2):
+        if turn_str not in ("1", "2"):
             raise ValueError("Turn must be 1 or 2")
 
-        board = self._chars_to_board(chars)
-        return self._hash_position(board, turn)
-        pass
+        if len(chars) != self._BOARD_SIZE:
+            raise ValueError(
+                f"Board must contain exactly {self._BOARD_SIZE} squares"
+            )
 
+        try:
+            board = [
+                self._WEB_CHAR_TO_PIECE[char]
+                for char in chars
+            ]
+        except KeyError as exc:
+            raise ValueError(
+                f"Invalid board character: {exc.args[0]}"
+            ) from exc
+
+        return self._hash_position(board, int(turn_str))
+    
     # converts a move to a String 
     # Convert binary move representation to a string move
     # ex. 0b01110101110 -> "b2-2-u-d1-3-d"
     def move_to_string(self, move: int, mode: StringMode) -> str:
         """
-        Returns a string representation of the move based on the given mode.
+        Converts an encoded move to a string.
+        AUTOGUI format: M_<from>_<to>_<sound>
         """
-        # Solver representation is a complete-turn move. For now return a
-        # readable multipart description for all modes. A dedicated AutoGUI
-        # half-move layer can be added later without changing solver logic.
         main_part, bond_part = self._unpack_move(move)
-        #main_part -> bits of main part of move
-        #bond_part -> bits of bond part of move
+
+        if mode == StringMode.AUTOGUI:
+            src, dest, current, promote = self._unpack_part(main_part)
+
+            sound = "x"
+
+            return f"M_{src}_{dest}_{sound}"
 
         text = self._part_to_string(main_part)
 
@@ -825,6 +853,5 @@ class KaniNariEbi(Game):
             text += "-" + self._part_to_string(bond_part)
 
         return text
-        pass
     
     
