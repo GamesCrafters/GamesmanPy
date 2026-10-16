@@ -1,25 +1,59 @@
 
+
 from kaninariebi import KaniNariEbi
 from models import StringMode
 
-for variant in ("regular", "mixed", "3x5"):
+variants = ("regular", "mixed", "3x5", "5x3")
+
+for variant in variants:
     game = KaniNariEbi(variant)
+    start = game.start()
 
-    position = game.start()
-
-    encoded = game.to_string(position, StringMode.Readable)
+    # Test 1: String round-trip
+    encoded = game.to_string(start, StringMode.Readable)
     restored = game.from_string(encoded)
 
-    print(f"Variant: {variant}")
-    print(f"Encoded: {encoded}")
-    print(f"Round-trip test: {'PASS' if position == restored else 'FAIL'}")
-    print()
+    assert restored == start
 
-    expected_rows = 3 if variant == "3x5" else 5
-    expected = "1_" + "C---c" * expected_rows
+    expected_row = (
+        "C" + "-" * (game._COLS - 2) + "c"
+    )
+    expected = "1_" + expected_row * game._ROWS
 
-    assert encoded == expected, (f"Expected {expected}, got {encoded}")
-    
-    assert position == restored
+    assert encoded == expected, (
+        f"{variant}: expected {expected}, got {encoded}"
+    )
 
-print("All tests passed!")
+    # Test 2: Complete legal moves
+    moves = game.generate_moves(start)
+
+    for move in moves:
+        next_pos = game.do_move(start, move)
+        next_str = game.to_string(
+            next_pos, StringMode.Readable
+        )
+        assert game.from_string(next_str) == next_pos
+
+    # Test 3: Group moves by AutoGUI arrow
+    groups = game._group_web_moves(start)
+
+    assert sum(len(g) for g in groups.values()) == len(moves)
+
+    ambiguous = {
+        key: group
+        for key, group in groups.items()
+        if len(group) > 1
+    }
+
+    print(f"\nVariant: {variant}")
+    print(f"Position: {encoded}")
+    print(f"Legal moves: {len(moves)}")
+    print(f"Unique arrows: {len(groups)}")
+    print(f"Arrows with multiple outcomes: {len(ambiguous)}")
+
+    for (src, dest), group in list(ambiguous.items())[:3]:
+        print(f"  M_{src}_{dest}_x -> {len(group)} choices")
+
+    print("PASS")
+
+print("\nAll tests passed!")

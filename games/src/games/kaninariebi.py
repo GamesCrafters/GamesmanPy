@@ -829,7 +829,34 @@ class KaniNariEbi(Game):
             ) from exc
 
         return self._hash_position(board, int(turn_str))
-    
+
+
+    def _group_web_moves(self, position: int) -> dict:
+        """
+        Group complete solver moves by their initial movement.
+
+        One visible AutoGUI arrow may correspond to multiple
+        complete moves with different current, promotion,
+        or Bond decisions.
+        """
+        groups = {}
+
+        for move in self.generate_moves(position):
+            main_part, bond_part = self._unpack_move(move)
+
+            src, dest, current, promote = self._unpack_part(
+                main_part
+            )
+
+            key = (src, dest)
+
+            if key not in groups:
+                groups[key] = []
+
+            groups[key].append(move)
+
+        return groups
+
     # converts a move to a String 
     # Convert binary move representation to a string move
     # ex. 0b01110101110 -> "b2-2-u-d1-3-d"
