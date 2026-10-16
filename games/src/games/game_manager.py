@@ -1,3 +1,4 @@
+from .bug import Bug
 from .chipschallenge import ChipsChallenge
 from .clobber import Clobber
 from .flowfree import FlowFree
@@ -15,6 +16,7 @@ from .test import Test
 from models import *
 
 game_list = {
+    "bug": Bug,
     "chipschallenge": ChipsChallenge,
     "clobber": Clobber,
     "flowfree": FlowFree,
