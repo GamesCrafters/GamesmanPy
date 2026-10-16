@@ -123,7 +123,8 @@ class Fjords(Game):
         if mode == StringMode.Readable:
             return self._render_readable(digits)
         if mode == StringMode.TUI:
-            return self._render_tui(digits)
+            turn = "Blue" if self._turn_code(digits) == self._BLUE else "Red"
+            return f"{self._render_tui(digits)}\n{turn}'s turn"
         raise NotImplementedError(f"to_string() mode {mode!r} not implemented.")
 
     def from_string(self, strposition: str) -> int:
