@@ -1,5 +1,7 @@
 from models import Game, Value, StringMode
 from typing import Optional
+import base64
+import json
 
 
 class KaniNariEbi(Game):
@@ -45,6 +47,15 @@ class KaniNariEbi(Game):
         _P2_SHRIMP: "🍤",
     }
     _CHAR_TO_PIECE = {v: k for k, v in _PIECE_TO_CHAR.items()}
+
+        # Additional AutoGUI centers, after all board squares.
+    _WEB_ACTIONS = ("UP", "DOWN", "YES", "NO", "END")
+
+    def _web_action_center(self, action: str) -> int:
+        if action not in self._WEB_ACTIONS:
+            raise ValueError(f"Unknown Web action: {action}")
+
+        return self._BOARD_SIZE + self._WEB_ACTIONS.index(action)
 
         # Web / AutoGUI board representation
     _WEB_PIECE_TO_CHAR = {
@@ -760,25 +771,46 @@ class KaniNariEbi(Game):
         pass
 
     # hash current position into printable String board representation
-    def to_string(self, position: int, mode: StringMode) -> str:
-        """
-        Returns a string representation of the position based on the given mode.
-        """
-        board, turn = self._unhash_position(position)
 
-        if mode in (StringMode.AUTOGUI, StringMode.Readable):
+
+    def to_string(self, position, mode: StringMode) -> str:
+        original, prefix = self._half_state(position)
+        board, turn = self._unhash_position(original)
+
+        if prefix:
+            board = self._preview_half_board(original, prefix)
+
+        if mode in (StringMode.Readable, StringMode.AUTOGUI):
             chars = "".join(
                 self._WEB_PIECE_TO_CHAR[piece]
                 for piece in board
             )
-            return f"{turn}_{chars}"
+
+            # AutoGUI sees only the visible board.
+        if mode == StringMode.AUTOGUI:
+            # Reserve one empty character for each UI action center.
+            return f"{turn}_{chars}" + "-" * len(self._WEB_ACTIONS)
+
+            # Readable retains the ORIGINAL board plus
+            # the selected steps, so the state is recoverable.
+            original_board, _ = self._unhash_position(original)
+            original_chars = "".join(
+                self._WEB_PIECE_TO_CHAR[piece]
+                for piece in original_board
+            )
+
+            result = f"{turn}_{original_chars}"
+
+            if prefix:
+                result += "~" + self._encode_half_prefix(prefix)
+
+            return result
 
         if mode == StringMode.TUI:
             chars = self._board_to_chars(board)
-
             rows = [
-                f"{self._ROWS - r} " +
-                chars[r * self._COLS:(r + 1) * self._COLS]
+                f"{self._ROWS - r} "
+                + chars[r * self._COLS:(r + 1) * self._COLS]
                 for r in range(self._ROWS)
             ]
 
@@ -787,24 +819,20 @@ class KaniNariEbi(Game):
                 for col in range(self._COLS)
             )
 
-            return (
-                f"  {columns}\n"
-                + "\n".join(rows)
-                + f"\nPlayer:{list(self._PIECE_TO_CHAR.values())[(turn * 2) - 1]}"
-            )
+            return f"  {columns}\n" + "\n".join(rows) + f"\nTurn: {turn}"
 
         raise ValueError("Unsupported StringMode")
 
     # unhash String board representation to the actual position
-    def from_string(self, strposition: str) -> int:
-        """
-        Converts a string position into an integer position.
 
-        Format: <turn>_<board>
-        Example: 1_C---cC---cC---cC---cC---c
+    def from_string(self, strposition: str):
         """
+        Parse a normal position or an intermediate Web state.
+        """
+        base, separator, encoded = strposition.strip().partition("~")
+
         try:
-            turn_str, chars = strposition.strip().split("_", 1)
+            turn_str, chars = base.split("_", 1)
         except ValueError as exc:
             raise ValueError(
                 "Position must have format '<turn>_<board>'"
@@ -815,7 +843,7 @@ class KaniNariEbi(Game):
 
         if len(chars) != self._BOARD_SIZE:
             raise ValueError(
-                f"Board must contain exactly {self._BOARD_SIZE} squares"
+                f"Board must contain {self._BOARD_SIZE} squares"
             )
 
         try:
@@ -828,8 +856,29 @@ class KaniNariEbi(Game):
                 f"Invalid board character: {exc.args[0]}"
             ) from exc
 
-        return self._hash_position(board, int(turn_str))
+        position = self._hash_position(board, int(turn_str))
 
+        if not separator:
+            return position
+
+        prefix = self._decode_half_prefix(encoded)
+        state = position
+
+        # Replay and validate all intermediate choices.
+        for choice in prefix:
+            if choice not in self.generate_half_moves(state):
+                raise ValueError(
+                    f"Illegal half-move choice: {choice}"
+                )
+
+            state, _, _, _ = self.do_half_move(state, choice)
+
+            if isinstance(state, int):
+                raise ValueError(
+                    "Completed moves must use a normal position string"
+                )
+
+        return state
 
     def _group_web_moves(self, position: int) -> dict:
         """
@@ -857,22 +906,370 @@ class KaniNariEbi(Game):
 
         return groups
 
+    
+    def _web_move_steps(self, position: int, move: int) -> tuple:
+        """
+        Decompose a complete solver move into Web UI choices.
+
+        The resulting sequence uniquely identifies the
+        complete move without modifying solver logic.
+        """
+        board, player = self._unhash_position(position)
+        main_part, bond_part = self._unpack_move(move)
+
+        src, dest, current, promote = self._unpack_part(main_part)
+
+        steps = [("move", src, dest)]
+
+        # Sea current choice
+        if self._coord(dest)[1] == self._CURRENT_COL:
+            steps.append(("current", current))
+
+        # Main move promotion choice
+        if (
+            self._is_crab(board[src])
+            and self._coord(dest)[1] == self._opponent_home_col(player)
+        ):
+            steps.append(("promote", int(promote)))
+
+        # Optional Bond movement
+        if bond_part is None:
+            steps.append(("end",))
+        else:
+            after_main = self._apply_part(board, main_part, player)
+
+            bsrc, bdest, bcurrent, bpromote = self._unpack_part(
+                bond_part
+            )
+
+            steps.append(("bond", bsrc, bdest))
+
+            if self._coord(bdest)[1] == self._CURRENT_COL:
+                steps.append(("bond_current", bcurrent))
+
+            if (
+                self._is_crab(after_main[bsrc])
+                and self._coord(bdest)[1] == self._opponent_home_col(player)
+            ):
+                steps.append(("bond_promote", int(bpromote)))
+
+        return tuple(steps)
+
+    
+    def _half_state(self, position):
+        """
+        A normal position is an int.
+        An intermediate Web state is (original_position, choices).
+        """
+        if isinstance(position, tuple):
+            original, choices = position
+            return original, choices
+
+        return position, ()
+
+    
+    @staticmethod
+    def _encode_half_prefix(prefix):
+        """Encode selected steps as URL-safe text."""
+        raw = json.dumps(
+            prefix, separators=(",", ":")
+        ).encode("utf-8")
+
+        return base64.urlsafe_b64encode(
+            raw
+        ).decode("ascii").rstrip("=")
+
+    @staticmethod
+    def _decode_half_prefix(encoded):
+        """Decode selected steps without using eval()."""
+        try:
+            padding = "=" * (-len(encoded) % 4)
+            raw = base64.urlsafe_b64decode(encoded + padding)
+            steps = json.loads(raw.decode("utf-8"))
+
+            if not isinstance(steps, list) or not 1 <= len(steps) <= 6:
+                raise ValueError("Invalid number of steps")
+
+            for step in steps:
+                if (
+                    not isinstance(step, list)
+                    or not step
+                    or not isinstance(step[0], str)
+                    or any(type(x) is not int for x in step[1:])
+                ):
+                    raise ValueError("Invalid step")
+
+            return tuple(tuple(step) for step in steps)
+
+        except Exception as exc:
+            raise ValueError("Invalid half-move encoding") from exc
+
+    def _preview_half_board(self, original, prefix):
+        """Show movements already selected in an unfinished turn."""
+        initial_board, player = self._unhash_position(original)
+
+        if not prefix:
+            return initial_board
+
+        matching = [
+            move for move in self.generate_moves(original)
+            if self._web_move_steps(original, move)[:len(prefix)] == prefix
+        ]
+
+        if not matching:
+            raise ValueError("Invalid half-move path")
+
+        choices = {step[0]: step for step in prefix}
+
+        _, src, dest = choices["move"]
+        board = self._move_piece(initial_board, src, dest)
+        landing = dest
+
+        if "current" in choices:
+            direction = choices["current"][1]
+            final = self._current_destination(
+                board, landing, direction
+            )
+            if final != landing:
+                board = self._move_piece(board, landing, final)
+            landing = final
+
+        if "promote" in choices and choices["promote"][1]:
+            board[landing] = self._shrimp_piece(player)
+
+        # Apply captures once the main move is fully determined.
+        main_codes = {
+            self._unpack_move(move)[0]
+            for move in matching
+        }
+
+        if len(main_codes) == 1:
+            main_part = next(iter(main_codes))
+            board = self._apply_part(
+                initial_board, main_part, player
+            )
+
+        # Preview Bond movement, if selected.
+        if "bond" in choices:
+            _, bsrc, bdest = choices["bond"]
+            board = self._move_piece(board, bsrc, bdest)
+            landing = bdest
+
+            if "bond_current" in choices:
+                direction = choices["bond_current"][1]
+                final = self._current_destination(
+                    board, landing, direction
+                )
+                if final != landing:
+                    board = self._move_piece(
+                        board, landing, final
+                    )
+                landing = final
+
+            if (
+                "bond_promote" in choices
+                and choices["bond_promote"][1]
+            ):
+                board[landing] = self._shrimp_piece(player)
+
+        return board
+
+
+    def generate_half_moves(self, position):
+        """
+        Return the available choices at the current Web stage.
+        """
+        original, prefix = self._half_state(position)
+
+        choices = []
+        seen = set()
+
+        for move in self.generate_moves(original):
+            steps = self._web_move_steps(original, move)
+
+            # Only consider moves matching previous selections.
+            if steps[:len(prefix)] != prefix:
+                continue
+
+            if len(steps) <= len(prefix):
+                continue
+
+            next_choice = steps[len(prefix)]
+
+            if next_choice not in seen:
+                seen.add(next_choice)
+                choices.append(next_choice)
+
+        return choices
+
+
+    @staticmethod
+    def _web_value_from_child(child_value):
+        """
+        Convert a child's position value (opponent's
+        perspective) into the current player's move value.
+        """
+        return {
+            Value.Win: Value.Loss,
+            Value.Loss: Value.Win,
+            Value.Tie: Value.Tie,
+            Value.Draw: Value.Draw,
+        }[Value(child_value)]
+
+
+
+    def do_half_move(self, position, half_move, move_dict=None):
+        """
+        Advance one Web choice.
+
+        With move_dict, use solved child positions to
+        evaluate this choice.
+        """
+        original, prefix = self._half_state(position)
+
+        if half_move not in self.generate_half_moves(position):
+            raise ValueError(f"Illegal Web choice: {half_move}")
+
+        new_prefix = prefix + (half_move,)
+
+        matching_moves = [
+            move
+            for move in self.generate_moves(original)
+            if self._web_move_steps(original, move)[:len(new_prefix)]
+            == new_prefix
+        ]
+
+        if not matching_moves:
+            raise ValueError("No matching complete move")
+
+        move_value = None
+
+        if move_dict is not None:
+            solved_moves = [
+                move for move in matching_moves
+                if move in move_dict
+            ]
+
+            # No database result supports this choice.
+            if not solved_moves:
+                return None, None, None, None
+
+            # All remaining choices belong to the same player.
+            # Choose the best available outcome for that player.
+            best_move = max(
+                solved_moves,
+                key=lambda move: int(
+                    self._web_value_from_child(
+                        move_dict[move][1]
+                    )
+                )
+            )
+
+            move_value = self._web_value_from_child(
+                move_dict[best_move][1]
+            )
+
+        if len(matching_moves) == 1:
+            complete_move = matching_moves[0]
+
+            new_position = self.do_move(
+                original, complete_move
+            )
+
+            if move_dict is None:
+                return new_position, None, None, None
+
+            if complete_move not in move_dict:
+                return None, None, None, None
+
+            child_rem, child_val = move_dict[complete_move]
+
+            return (
+                new_position,
+                move_value,
+                child_rem,
+                child_val,
+            )
+
+        # Several complete moves remain:
+        # preserve the original position and choices.
+        intermediate = (original, new_prefix)
+
+        return intermediate, move_value, None, None
+
+
+
     # converts a move to a String 
     # Convert binary move representation to a string move
     # ex. 0b01110101110 -> "b2-2-u-d1-3-d"
-    def move_to_string(self, move: int, mode: StringMode) -> str:
+
+    def move_to_string(self, move, mode: StringMode) -> str:
         """
-        Converts an encoded move to a string.
-        AUTOGUI format: M_<from>_<to>_<sound>
+        Convert full solver moves or Web half-moves to strings.
         """
+        # Web half-move: tuple such as ("current", 1)
+        if isinstance(move, tuple):
+            kind = move[0]
+
+            if mode == StringMode.AUTOGUI:
+                # Normal or Bond piece movement
+                if kind in ("move", "bond"):
+                    _, src, dest = move
+                    return f"M_{src}_{dest}_x"
+
+                # Sea current choice
+                if kind in ("current", "bond_current"):
+                    direction = move[1]
+
+                    if direction == self._CURRENT_UP:
+                        action = "UP"
+                    elif direction == self._CURRENT_DOWN:
+                        action = "DOWN"
+                    else:
+                        raise ValueError("Invalid current direction")
+
+                    center = self._web_action_center(action)
+                    return f"T_{action}_{center}_-"
+
+                # Promotion choice
+                if kind in ("promote", "bond_promote"):
+                    action = "YES" if move[1] else "NO"
+                    center = self._web_action_center(action)
+                    return f"T_{action}_{center}_-"
+
+                # Finish the turn without Bond
+                if kind == "end":
+                    center = self._web_action_center("END")
+                    return f"T_END_{center}_-"
+
+                raise ValueError(f"Unknown half-move type: {kind}")
+
+            # Human-readable half-move
+            if kind in ("move", "bond"):
+                return (
+                    f"{kind}: "
+                    f"{self._square_name(move[1])}"
+                    f"->{self._square_name(move[2])}"
+                )
+
+            if kind in ("current", "bond_current"):
+                direction = "up" if move[1] == self._CURRENT_UP else "down"
+                return f"{kind}: {direction}"
+
+            if kind in ("promote", "bond_promote"):
+                return f"{kind}: {'yes' if move[1] else 'no'}"
+
+            if kind == "end":
+                return "End turn"
+
+            raise ValueError(f"Unknown half-move type: {kind}")
+
+        # Original complete solver move
         main_part, bond_part = self._unpack_move(move)
 
         if mode == StringMode.AUTOGUI:
             src, dest, current, promote = self._unpack_part(main_part)
-
-            sound = "x"
-
-            return f"M_{src}_{dest}_{sound}"
+            return f"M_{src}_{dest}_x"
 
         text = self._part_to_string(main_part)
 
@@ -880,5 +1277,10 @@ class KaniNariEbi(Game):
             text += "-" + self._part_to_string(bond_part)
 
         return text
+
+
+    def hash_ext(self, position):
+        original, _ = self._half_state(position)
+        return original
     
     

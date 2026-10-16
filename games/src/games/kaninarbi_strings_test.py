@@ -45,6 +45,20 @@ for variant in variants:
         if len(group) > 1
     }
 
+
+    # Test 4: Every complete move must have a unique choice path
+    paths = [
+        game._web_move_steps(start, move)
+        for move in moves
+    ]
+
+    assert len(paths) == len(set(paths)), (
+        f"{variant}: Multiple moves share the same Web choices"
+    )
+
+    print(f"Unique Web move paths: {len(paths)}")
+
+
     print(f"\nVariant: {variant}")
     print(f"Position: {encoded}")
     print(f"Legal moves: {len(moves)}")
