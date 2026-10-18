@@ -415,7 +415,46 @@ class Bug(Game):
         """
         Returns a string representation of the move based on the given mode.
         """
-        if mode != StringMode.TUI:
+        if mode == StringMode.TUI:
+            s = str(move)[1:]                     # drop the player digit
+            return " ".join(self.LABELS[int(s[i:i+2]) - 1] for i in range(0, len(s), 2))
+        elif mode == StringMode.AUTOGUI:
+            # will generate only a circle at each move in current_half_moves (see below)
+            return f"A_-_{move}_-"
+        
+        else:
             return str(move)
-        s = str(move)[1:]                     # drop the player digit
-        return " ".join(self.LABELS[int(s[i:i+2]) - 1] for i in range(0, len(s), 2))
+
+    # list of all moves possible at the start of the turn. will gradually remove/whittle down moves until list is empty, then return position
+    movesRemaining = [999]
+    #using this to understand what the prev position looked like, so I know what move was picked
+    movePicked = 0
+    
+    def generate_half_moves(self, position:int):
+        #initialize movesRemaining list if this is the first halfmove. I'm using 999 as a unique flag
+        if Bug.movesRemaining == [999]:
+            Bug.movesRemaining = Bug.generate_moves(self, position)
+
+        #if there are no moves left, return the position, this will end the half_moves chain
+        elif Bug.movesRemaining == []:
+            return position
+            
+        #if this is not the first time. according to move picked, update list accordingly. remove all moves that are no longer possible. cut the used move out of remaining moves.
+        else:
+            updatedMovesRemaining = []
+            for move in Bug.movesRemaining:
+                if int(str(move)[0:2]) == Bug.movePicked:
+                    updatedMovesRemaining.append(int(str(move)[2:]))
+            Bug.movesRemaining = updatedMovesRemaining
+    
+        #define the moves available at this specific point in time
+        current_half_moves = []
+
+        for move in Bug.movesRemaining:
+            current_half_moves.append(int(str(move)[0:2]))
+
+        return current_half_moves
+
+    def do_half_move(self, position:int, move:int):
+        Bug.movePicked = move
+        return Bug.do_move(self, position, move)
