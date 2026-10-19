@@ -773,6 +773,7 @@ class KaniNariEbi(Game):
     # hash current position into printable String board representation
 
 
+    
     def to_string(self, position, mode: StringMode) -> str:
         original, prefix = self._half_state(position)
         board, turn = self._unhash_position(original)
@@ -786,13 +787,9 @@ class KaniNariEbi(Game):
                 for piece in board
             )
 
-            # AutoGUI sees only the visible board.
-        if mode == StringMode.AUTOGUI:
-            # Reserve one empty character for each UI action center.
-            return f"{turn}_{chars}" + "-" * len(self._WEB_ACTIONS)
+            if mode == StringMode.AUTOGUI:
+                return f"{turn}_{chars}" + "-" * len(self._WEB_ACTIONS)
 
-            # Readable retains the ORIGINAL board plus
-            # the selected steps, so the state is recoverable.
             original_board, _ = self._unhash_position(original)
             original_chars = "".join(
                 self._WEB_PIECE_TO_CHAR[piece]
@@ -808,6 +805,7 @@ class KaniNariEbi(Game):
 
         if mode == StringMode.TUI:
             chars = self._board_to_chars(board)
+
             rows = [
                 f"{self._ROWS - r} "
                 + chars[r * self._COLS:(r + 1) * self._COLS]
@@ -819,11 +817,13 @@ class KaniNariEbi(Game):
                 for col in range(self._COLS)
             )
 
-            return f"  {columns}\n" + "\n".join(rows) + f"\nTurn: {turn}"
+            return (
+                f"  {columns}\n"
+                + "\n".join(rows)
+                + f"\nTurn: {turn}"
+            )
 
         raise ValueError("Unsupported StringMode")
-
-    # unhash String board representation to the actual position
 
     def from_string(self, strposition: str):
         """
