@@ -1230,18 +1230,18 @@ class KaniNariEbi(Game):
                         raise ValueError("Invalid current direction")
 
                     center = self._web_action_center(action)
-                    return f"T_{action[0]}_{center}_-"
+                    return f"A_{action[0]}_{center}_-"
 
                 # Promotion choice
                 if kind in ("promote", "bond_promote"):
                     action = "YES" if move[1] else "NO"
                     center = self._web_action_center(action)
-                    return f"T_{action[0]}_{center}_-"
+                    return f"A_{action[0]}_{center}_-"
 
                 # Finish the turn without Bond
                 if kind == "end":
                     center = self._web_action_center("END")
-                    return f"T_E_{center}_-"
+                    return f"A_E_{center}_-"
 
                 raise ValueError(f"Unknown half-move type: {kind}")
 
