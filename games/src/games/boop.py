@@ -366,7 +366,10 @@ class Boop(Game):
         if mode == StringMode.Readable:
             return f"{turn}|{''.join(self.SYMBOLS[p] for p in board)}|" + ",".join(map(str, supply))
         if mode == StringMode.AUTOGUI:
-            raise NotImplementedError("Boop currently supports text display only")
+            cells = "".join(self.SYMBOLS[p] if p else "-" for p in board)
+            p1 = ("k" * supply[0] + "K" * supply[1]).ljust(self.PIECES, "-")
+            p2 = ("l" * supply[2] + "L" * supply[3]).ljust(self.PIECES, "-")
+            return f"{turn}_{cells}{p1}{p2}" + "-" * 56
         if mode != StringMode.TUI:
             raise ValueError("Unknown string mode")
         border = "    +" + "---+" * self.SIZE
@@ -399,7 +402,11 @@ class Boop(Game):
 
     def move_to_string(self, move: int, mode: StringMode) -> str:
         if mode == StringMode.AUTOGUI:
-            raise NotImplementedError("Boop currently supports text display only")
+            selected, base = divmod(move, self.PLACEMENTS)
+            kind, square = divmod(base, self.CELLS)
+            if not selected:
+                return f"A_{'ab'[kind]}_{(22, 38)[kind] + square}_x"
+            return f"A_{'ab'[kind]}_{square}_x"
         if mode not in (StringMode.Readable, StringMode.TUI):
             raise ValueError("Unknown string mode")
         if not isinstance(move, int) or move < 0:
