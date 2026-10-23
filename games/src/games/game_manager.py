@@ -11,10 +11,12 @@ from .snakestale import Snakestale
 from .sokobaniq import SokobanIQ
 from .sokobanlarge import SokobanLarge
 from .stormyseas import StormySeas
+from .boop import Boop
 from .test import Test
 from models import *
 
 game_list = {
+    "boop": Boop,
     "chipschallenge": ChipsChallenge,
     "clobber": Clobber,
     "flowfree": FlowFree,
