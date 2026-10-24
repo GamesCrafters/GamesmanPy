@@ -41,6 +41,16 @@ STRING FORMATS
                          move 'M_<source index>_<target index>_x', skip 'M_skip'.
 
 
+TWO-CLICK MOVES
+    In the web UI a capture takes two clicks: first a checker ('A_-_<index>_-'
+    on it), then one of its captures (an arrow).  Clicking the selected checker
+    again deselects it (Readable move '~<square>').  The half-way position is the
+    same board with that checker selected: Readable adds '_<square>' (e.g.
+    'xxoxooxoxxoxooxox_c4'), AUTOGUI draws it uppercase ('X' or 'O').  The
+    selection lives above the position hash and `hash_ext` drops it, so the
+    solver and database never see it.
+
+
 DATA REPRESENTATION
     Cell         EMPTY = 0, RED = 1, BLUE = 2.
 
@@ -121,6 +131,26 @@ def _paint(text: str, code: str, use_color: bool) -> str:
     return f'\033[{code}m{text}\033[0m' if use_color else text
 
 
+def _flip(value: Value) -> Value:
+    """
+    Turns a child's value (for the opponent) into the mover's move value.
+    """
+    return {Value.Win: Value.Loss, Value.Loss: Value.Win}.get(value, value)
+
+
+def _child_preference(child: tuple[int, Value]) -> tuple[int, int]:
+    """
+    Sort key over (remoteness, value) children, best for the mover first: the
+    quickest opponent loss, then ties, draws, and the slowest opponent win.
+    """
+    (remoteness, value) = child
+    match value:
+        case Value.Loss: return (0, remoteness)
+        case Value.Tie: return (1, remoteness)
+        case Value.Draw: return (2, 0)
+        case _: return (3, -remoteness)
+
+
 class Clusterfuss(Game):
     id = 'clusterfuss'
     # 3x3 leaves its centre empty so both players start with the same number of
@@ -129,6 +159,9 @@ class Clusterfuss(Game):
     n_players = 2
     # Every capture removes at least one checker, so no position can repeat.
     cyclic = False
+    # The web UI splits each capture into two clicks: select a checker, then
+    # pick one of its captures.  See TWO-CLICK MOVES above.
+    uses_half_moves = True
 
     def __init__(self, variant_id: str):
         if variant_id not in Clusterfuss.variants:
@@ -140,6 +173,14 @@ class Clusterfuss(Game):
         # Sentinel move for a skipped turn.  Its source index is out of range of
         # any real square, so it can never collide with an encoded capture.
         self._skip_move = self._n_cells << 2
+        # A selected checker i is stored above the position hash as
+        # (i + 1) * _select_base.  `unhash` only reads the board digits, so it
+        # ignores the selection, and `hash_ext` strips it for database lookups.
+        self._select_base = 2 * 3 ** self._n_cells
+        # Half move "select checker i" is _select_move_base + i, above the skip,
+        # and "deselect checker i" is _deselect_move_base + i.
+        self._select_move_base = (self._n_cells + 1) << 2
+        self._deselect_move_base = self._select_move_base + self._n_cells
 
     # ------------------------------------------------------------------
     # Game interface
@@ -210,24 +251,34 @@ class Clusterfuss(Game):
         (board, turn) = self.unhash(position)
         if mode == StringMode.TUI:
             return self.board_to_tui(board, turn)
-        cells = ''.join(_CELL_TO_CHAR[cell] for cell in board)
+        selected = self.selection(position)
+        chars = [_CELL_TO_CHAR[cell] for cell in board]
         if mode == StringMode.AUTOGUI:
-            return ('1_' if turn == RED else '2_') + cells
-        return _CELL_TO_CHAR[turn] + cells
+            # The selected checker is drawn with its uppercase, highlighted image.
+            if selected is not None:
+                chars[selected] = chars[selected].upper()
+            return ('1_' if turn == RED else '2_') + ''.join(chars)
+        suffix = '' if selected is None else '_' + self.square_name(selected)
+        return _CELL_TO_CHAR[turn] + ''.join(chars) + suffix
 
     def from_string(self, strposition: str) -> int:
         """
         Returns the position from a string representation of the position.
         Input string is StringMode.Readable: the side to move followed by one
-        character per cell, row-major from the top-left square.
+        character per cell, row-major from the top-left square, optionally
+        followed by '_' and the square of a selected checker, e.g. '_c4'.
         """
+        (strposition, _, selected) = strposition.partition('_')
         if len(strposition) != self._n_cells + 1:
             raise ValueError("Position string has the wrong length")
         turn = _CHAR_TO_CELL[strposition[0]]
         if turn == EMPTY:
             raise ValueError("Position string has no side to move")
         board = [_CHAR_TO_CELL[c] for c in strposition[1:]]
-        return self.hash(board, turn)
+        position = self.hash(board, turn)
+        if selected:
+            position += (self.square_index(selected) + 1) * self._select_base
+        return position
 
     def move_to_string(self, move: int, mode: StringMode) -> str:
         """
@@ -235,10 +286,92 @@ class Clusterfuss(Game):
         """
         if move == self._skip_move:
             return 'M_skip' if mode == StringMode.AUTOGUI else SKIP_STRING
+        if move >= self._deselect_move_base:
+            index = move - self._deselect_move_base
+            if mode == StringMode.AUTOGUI:
+                return f'A_-_{index}_-'
+            return '~' + self.square_name(index)
+        if move >= self._select_move_base:
+            index = move - self._select_move_base
+            if mode == StringMode.AUTOGUI:
+                return f'A_-_{index}_-'
+            return self.square_name(index)
         (index, dir) = self.decode_move(move)
         if mode == StringMode.AUTOGUI:
             return f'M_{index}_{self.step(index, dir)}_x'
         return self.square_name(index) + _DIR_TO_CHAR[dir]
+
+    # ------------------------------------------------------------------
+    # Two-click moves (web UI only; the solver never sees a selection)
+    # ------------------------------------------------------------------
+    def hash_ext(self, position: int) -> int:
+        """
+        Drops the selected checker, so a half-way position shares its
+        database entry with the position it was selected from.
+        """
+        return position % self._select_base
+
+    def selection(self, position: int) -> Optional[int]:
+        """
+        Returns the index of the selected checker, or None if there is none.
+        """
+        selected = position // self._select_base
+        return selected - 1 if selected else None
+
+    def generate_half_moves(self, position: int) -> list[int]:
+        """
+        Without a selection: one "select" half move per checker that has a
+        capture.  With one: the selected checker's captures, a "deselect" on
+        that checker, and "select" half moves for the other checkers so the
+        player can switch.  A skip is a single click either way.
+
+        Checkers that a capture arrow points at get no "select" button: it
+        would sit under the arrowhead and catch the click meant for the
+        arrow, so two friendly neighbours would just keep selecting each
+        other.
+        """
+        moves = self.generate_moves(position)
+        if moves == [self._skip_move]:
+            return moves
+        selected = self.selection(position)
+        sources = sorted({move >> 2 for move in moves})
+        half_moves = [move for move in moves if move >> 2 == selected]
+        targets = {self.step(*self.decode_move(move)) for move in half_moves}
+        if selected is not None:
+            half_moves.append(self._deselect_move_base + selected)
+        return half_moves + [self._select_move_base + index for index in sources
+                             if index != selected and index not in targets]
+
+    def do_half_move(self, position: int, move: int,
+                     move_dict: dict[int, tuple[int, Value]]):
+        """
+        Returns (position, move value, remoteness, position value) for the
+        server, or Nones if the child is missing from the database.
+        `move_dict` maps each full move to its child's (remoteness, value).
+
+        A capture or skip returns the real child.  Selecting a checker reports
+        that checker's best capture: its child's remoteness and value (from
+        the opponent's side), so UWAPI shades the selection button exactly as
+        it would shade that capture.  Deselecting reports the best capture of
+        any checker, since the player is back to a free choice.
+        """
+        if move < self._select_move_base:
+            if move not in move_dict:
+                return (None, None, None, None)
+            (remoteness, value) = move_dict[move]
+            return (self.do_move(position, move), _flip(value), remoteness, value)
+        if move >= self._deselect_move_base:
+            children = list(move_dict.values())
+            new_position = self.hash_ext(position)
+        else:
+            index = move - self._select_move_base
+            children = [child for (full_move, child) in move_dict.items()
+                        if full_move >> 2 == index]
+            new_position = self.hash_ext(position) + (index + 1) * self._select_base
+        if not children:
+            return (None, None, None, None)
+        (remoteness, value) = min(children, key=_child_preference)
+        return (new_position, _flip(value), remoteness, value)
 
     # ------------------------------------------------------------------
     # Rules helpers (core logic)
@@ -400,6 +533,16 @@ class Clusterfuss(Game):
         """
         (row, col) = self.get_coord(index)
         return f'{chr(ord("a") + col)}{self._rows - row}'
+
+    def square_index(self, name: str) -> int:
+        """
+        Inverse of `square_name`, e.g. 'a4' -> 0 on 4x4.
+        """
+        col = ord(name[0]) - ord('a')
+        row = self._rows - int(name[1:])
+        if not (0 <= row < self._rows and 0 <= col < self._cols):
+            raise ValueError(f"No square named {name}")
+        return self.get_index(row, col)
 
     def board_to_tui(self, board: list[int], turn: int) -> str:
         """
