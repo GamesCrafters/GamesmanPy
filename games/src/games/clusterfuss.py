@@ -1,10 +1,11 @@
 """
 Clusterfuss, by Mark Steere (July 2023).  https://marksteeregames.com
 
-Two players, Red and Blue, on a rows x cols board initially filled with
+Two players, Blue and Red, on a rows x cols board initially filled with
 checkers in a checkerboard pattern.  On an odd x odd board the centre square is
-left empty, so both sides start with the same number of checkers.  Red moves
-first.
+left empty, so both sides start with the same number of checkers.  Blue moves
+first.  (The colours are only names; the first player is Blue to match
+GamesmanUni, which always draws player 1 in blue.)
 
 MOVES        Every move is an orthogonal king capture: you move one of your own
              checkers one square up/down/left/right onto an occupied square,
@@ -31,18 +32,35 @@ OBJECT       Remove all enemy checkers from the board.
 
 STRING FORMATS
     Position (Readable)  side to move, then the board in row-major order from
-                         the top-left square:  'x' Red, 'o' Blue, '-' empty.
+                         the top-left square:  'x' Blue, 'o' Red, '-' empty.
                          e.g. 4x4 start -> 'xxoxooxoxxoxooxox'
     Move                 source square + direction, e.g. 'c4u'.  Squares are
                          named chess-style: file letter a.. left to right, rank
                          number 1.. bottom to top.  Directions are udlr
                          (u up, d down, l left, r right).  A skip is '-'.
-    AUTOGUI              position '1_' (Red to move) or '2_' (Blue) + cells;
+    AUTOGUI              position '1_' (Blue to move) or '2_' (Red) + cells;
                          move 'M_<source index>_<target index>_x', skip 'M_skip'.
+
+    Two-click moves (half moves, used by the web UI only):
+    Selected position    Readable position + '_' + the selected square, e.g.
+                         'xxoxo_a2'.
+    AUTOGUI selection    every AUTOGUI position has a second layer of n_cells
+                         characters after the cells: 's' over the selected
+                         checker, '-' elsewhere.  The checker itself stays
+                         'x'/'o', so GamesmanUni's simpleSlides animation still
+                         slides it when the capture is played.  The AUTOGUI
+                         theme repeats the cell centres for this layer.
+    Select / deselect    Readable: the square, e.g. 'a2'; deselect '~a2'.
+                         AUTOGUI: a circle button 'A_-_<index>_-' on the square.
+                         Clicking the selected checker again deselects it.
+    Second click         an ordinary capture 'M_<source>_<target>_x' from the
+                         selected checker.  A square the selected checker can
+                         capture shows only that capture, so to select a
+                         friendly checker there instead, deselect first.
 
 
 DATA REPRESENTATION
-    Cell         EMPTY = 0, RED = 1, BLUE = 2.
+    Cell         EMPTY = 0, BLUE = 1, RED = 2.
 
     Board        A flat list of length rows * cols in row-major order, index 0
                  at the top-left.  Row numbers grow downward, so index 0 is
@@ -71,11 +89,21 @@ DATA REPRESENTATION
                  cannot collide with a capture.
 
     Position     (board as a base-3 number << 1) | side to move, where cell i
-                 has weight 3**i and the low bit is 0 for Red, 1 for Blue.  The
-                 2x2 start [RED, BLUE, BLUE, RED] with Red to move is
+                 has weight 3**i and the low bit is 0 for Blue, 1 for Red.  The
+                 2x2 start [BLUE, RED, RED, BLUE] with Blue to move is
                  (1 + 2*3 + 2*9 + 1*27) << 1 | 0 = 104.  The encoding space is
                  2 * 3**n_cells, but only a small fraction is reachable (about
                  520k positions on 4x4).
+
+    Selection    A selected position adds (selected index + 1) * 2 * 3**n_cells
+                 on top of the position, so it sits above the whole encoding
+                 space and `hash_ext` (position % 2 * 3**n_cells) strips it off.
+                 The solver never sees a selection; the database only stores
+                 plain positions.
+
+    Half move    Moves numbered after the skip: select square i is
+                 ((n_cells + 1) << 2) + i, deselect square i is that base plus
+                 n_cells + i.  Both are above every capture and the skip.
 """
 
 import os
@@ -85,12 +113,12 @@ from models import Game, Value, StringMode
 from typing import Optional
 
 # --- cell contents ----------------------------------------------------------
-# One base-3 digit per cell in the position hash; RED and BLUE double as the
+# One base-3 digit per cell in the position hash; BLUE and RED double as the
 # side-to-move values.  See DATA REPRESENTATION above.
-EMPTY, RED, BLUE = 0, 1, 2
+EMPTY, BLUE, RED = 0, 1, 2
 
-_CELL_TO_CHAR = {EMPTY: '-', RED: 'x', BLUE: 'o'}
-_CHAR_TO_CELL = {'-': EMPTY, 'x': RED, 'o': BLUE}
+_CELL_TO_CHAR = {EMPTY: '-', BLUE: 'x', RED: 'o'}
+_CHAR_TO_CELL = {'-': EMPTY, 'x': BLUE, 'o': RED}
 
 # --- move encoding ----------------------------------------------------------
 # A move is  (source_index << 2) | direction,  where direction is one of the
@@ -115,17 +143,26 @@ SKIP_STRING = '-'
 
 def _paint(text: str, code: str, use_color: bool) -> str:
     """
-    Wraps `text` in the ANSI SGR escape `code` (e.g. '1;91' bold bright red)
+    Wraps `text` in the ANSI SGR escape `code` (e.g. '1;94' bold bright blue)
     when `use_color` is set; otherwise returns `text` unchanged.
     """
     return f'\033[{code}m{text}\033[0m' if use_color else text
 
 
 def _flip(value: Value) -> Value:
+    """
+    Converts a child position's value (for the side to move there) into the
+    value of the move that reaches it (for the mover).
+    """
     return {Value.Win: Value.Loss, Value.Loss: Value.Win}.get(value, value)
 
 
 def _child_preference(child: tuple[int, Value]) -> tuple[int, int]:
+    """
+    Sort key for (remoteness, value) children, best for the mover first: a
+    quick Loss for the opponent, then a quick Tie, then Draw, then the slowest
+    Win for the opponent.
+    """
     (remoteness, value) = child
     match value:
         case Value.Loss: return (0, remoteness)
@@ -154,6 +191,7 @@ class Clusterfuss(Game):
         # Sentinel move for a skipped turn.  Its source index is out of range of
         # any real square, so it can never collide with an encoded capture.
         self._skip_move = self._n_cells << 2
+        # Two-click (half move) encodings; see Selection and Half move above.
         self._select_base = 2 * 3 ** self._n_cells
         self._select_move_base = (self._n_cells + 1) << 2
         self._deselect_move_base = self._select_move_base + self._n_cells
@@ -163,10 +201,10 @@ class Clusterfuss(Game):
     # ------------------------------------------------------------------
     def start(self) -> int:
         """
-        Returns the starting position of the game: the start board with Red to
+        Returns the starting position of the game: the start board with Blue to
         move.
         """
-        return self.hash(self.start_board(), RED)
+        return self.hash(self.start_board(), BLUE)
 
     def generate_moves(self, position: int) -> list[int]:
         (board, player) = self.unhash(position)
@@ -230,9 +268,11 @@ class Clusterfuss(Game):
         selected = self.selection(position)
         chars = [_CELL_TO_CHAR[cell] for cell in board]
         if mode == StringMode.AUTOGUI:
+            # Selection layer; see AUTOGUI selection above.
+            marks = ['-'] * self._n_cells
             if selected is not None:
-                chars[selected] = chars[selected].upper()
-            return ('1_' if turn == RED else '2_') + ''.join(chars)
+                marks[selected] = 's'
+            return ('1_' if turn == BLUE else '2_') + ''.join(chars + marks)
         suffix = '' if selected is None else '_' + self.square_name(selected)
         return _CELL_TO_CHAR[turn] + ''.join(chars) + suffix
 
@@ -240,7 +280,8 @@ class Clusterfuss(Game):
         """
         Returns the position from a string representation of the position.
         Input string is StringMode.Readable: the side to move followed by one
-        character per cell, row-major from the top-left square.
+        character per cell, row-major from the top-left square, optionally
+        followed by '_' and the selected square.
         """
         (strposition, _, selected) = strposition.partition('_')
         if len(strposition) != self._n_cells + 1:
@@ -275,14 +316,30 @@ class Clusterfuss(Game):
             return f'M_{index}_{self.step(index, dir)}_x'
         return self.square_name(index) + _DIR_TO_CHAR[dir]
 
+    # ------------------------------------------------------------------
+    # Two-click moves (half moves) for the web UI
+    # ------------------------------------------------------------------
     def hash_ext(self, position: int) -> int:
+        """
+        Drops the selection, giving the plain position the database stores.
+        """
         return position % self._select_base
 
     def selection(self, position: int) -> Optional[int]:
+        """
+        Returns the index of the selected checker, or None if none is selected.
+        """
         selected = position // self._select_base
         return selected - 1 if selected else None
 
     def generate_half_moves(self, position: int) -> list[int]:
+        """
+        Returns the buttons the web UI shows.  With nothing selected: select
+        any checker that has a legal capture.  With a checker selected: its
+        captures, deselect it (click it again), and select another checker,
+        except on squares it can capture (one click there means the capture).
+        A skip is shown as-is.
+        """
         moves = self.generate_moves(position)
         if moves == [self._skip_move]:
             return moves
@@ -297,6 +354,15 @@ class Clusterfuss(Game):
 
     def do_half_move(self, position: int, move: int,
                      move_dict: dict[int, tuple[int, Value]]):
+        """
+        Returns (new position, move value, remoteness, position value) for the
+        server, or four Nones if the move leads nowhere solved.  `move_dict`
+        maps each full move to its child's (remoteness, value).
+
+        A capture or skip reports its child as usual.  A select or deselect
+        keeps the same side to move, so it reports the best child still
+        reachable from the new selection, as if the mover played it next.
+        """
         if move < self._select_move_base:
             if move not in move_dict:
                 return (None, None, None, None)
@@ -451,12 +517,12 @@ class Clusterfuss(Game):
 
     def start_board(self) -> list[int]:
         """
-        Returns the start board: a checkerboard with Red on every square where
+        Returns the start board: a checkerboard with Blue on every square where
         (row + col) is even, and on an odd board the centre square left empty
         so both sides have the same number of checkers.
         """
         board = [
-            RED if (r + c) % 2 == 0 else BLUE
+            BLUE if (r + c) % 2 == 0 else RED
             for r in range(self._rows)
             for c in range(self._cols)
         ]
@@ -465,7 +531,7 @@ class Clusterfuss(Game):
         return board
 
     def opponent(self, player: int) -> int:
-        return BLUE if player == RED else RED
+        return RED if player == BLUE else BLUE
 
     def square_name(self, index: int) -> str:
         """
@@ -477,6 +543,9 @@ class Clusterfuss(Game):
         return f'{chr(ord("a") + col)}{self._rows - row}'
 
     def square_index(self, name: str) -> int:
+        """
+        Inverse of `square_name`: returns the cell index of a square like 'a2'.
+        """
         col = ord(name[0]) - ord('a')
         row = self._rows - int(name[1:])
         if not (0 <= row < self._rows and 0 <= col < self._cols):
@@ -486,13 +555,13 @@ class Clusterfuss(Game):
     def board_to_tui(self, board: list[int], turn: int) -> str:
         """
         Returns the human-facing board drawing used by the TUI: a box-drawn
-        grid with file letters and rank numbers, Red as a filled disc and Blue
+        grid with file letters and rank numbers, Blue as a filled disc and Red
         as a hollow one.
 
         Degrades on weaker terminals instead of breaking:
           - If stdout's encoding cannot represent the Unicode glyphs (e.g. a
             cp1252 Windows console or a redirected file), the board is drawn
-            in plain ASCII: +---+ borders, Red 'X', Blue 'O'.
+            in plain ASCII: +---+ borders, Blue 'X', Red 'O'.
           - Colour is added only when stdout is a terminal, NO_COLOR is unset
             and TERM is not 'dumb'.  On Windows, ANSI handling is switched on
             in the console first; if that fails (pre-Windows 10), no colour.
@@ -522,21 +591,21 @@ class Clusterfuss(Game):
                 use_color = False
 
         if fancy:
-            (red, blue, arrow) = ('●', '○', '▶')
+            (blue, red, arrow) = ('●', '○', '▶')
             (h, v) = ('─', '│')
             (top, middle, bottom) = (('┌', '┬', '┐'),
                                      ('├', '┼', '┤'),
                                      ('└', '┴', '┘'))
         else:
-            (red, blue, arrow) = ('X', 'O', '>')
+            (blue, red, arrow) = ('X', 'O', '>')
             (h, v) = ('-', '|')
             top = middle = bottom = ('+', '+', '+')
 
         glyph = {EMPTY: ' ',
-                 RED: _paint(red, '1;91', use_color),
-                 BLUE: _paint(blue, '1;94', use_color)}
-        name = {RED: _paint(f'{red} Red', '1;91', use_color),
-                BLUE: _paint(f'{blue} Blue', '1;94', use_color)}
+                 BLUE: _paint(blue, '1;94', use_color),
+                 RED: _paint(red, '1;91', use_color)}
+        name = {BLUE: _paint(f'{blue} Blue', '1;94', use_color),
+                RED: _paint(f'{red} Red', '1;91', use_color)}
 
         width = len(str(self._rows))
         pad = ' ' * width
@@ -553,8 +622,8 @@ class Clusterfuss(Game):
             lines.append(rule(middle if r < self._rows - 1 else bottom))
         lines.append(f'{pad}   ' + '   '.join(chr(ord('a') + c) for c in range(self._cols)))
         lines.append('')
-        lines.append(f'{pad} {name[RED]} {board.count(RED)}   '
-                     f'{name[BLUE]} {board.count(BLUE)}   {arrow} {name[turn]} to move')
+        lines.append(f'{pad} {name[BLUE]} {board.count(BLUE)}   '
+                     f'{name[RED]} {board.count(RED)}   {arrow} {name[turn]} to move')
         return '\n'.join(lines)
 
     # ------------------------------------------------------------------
@@ -566,7 +635,7 @@ class Clusterfuss(Game):
 
         Idea: an integer can hold a row of digits, just as 352 holds 3, 5, 2
         (3*10**2 + 5*10**1 + 2*10**0).  Each cell has exactly three states
-        (EMPTY 0, RED 1, BLUE 2), so we treat each cell as one base-3 digit,
+        (EMPTY 0, BLUE 1, RED 2), so we treat each cell as one base-3 digit,
         with cell i weighted 3**i:
 
             board value = board[0]*3**0 + board[1]*3**1 + ... + board[n-1]*3**(n-1)
@@ -575,13 +644,13 @@ class Clusterfuss(Game):
         values.  The side to move then goes in one extra base-2 digit at the
         very bottom, making the result a mixed-radix number:
 
-            hash = board value * 2 + (0 if Red to move else 1)
+            hash = board value * 2 + (0 if Blue to move else 1)
 
-        so an even hash means Red to move, an odd one Blue.  `<< 1` and `|` are
+        so an even hash means Blue to move, an odd one Red.  `<< 1` and `|` are
         just `* 2` and `+`.  Note the integer itself has no base; base 3 and
         base 2 are only the two ways the code reads its digits.
 
-        Example, 2x2 start, board [RED, BLUE, BLUE, RED], Red to move:
+        Example, 2x2 start, board [BLUE, RED, RED, BLUE], Blue to move:
             board value = 1*1 + 2*3 + 2*9 + 1*27 = 52   (base 3: 1221)
             hash        = 52 * 2 + 0            = 104
         """
@@ -593,7 +662,7 @@ class Clusterfuss(Game):
         for cell in reversed(board):
             position = position * 3 + cell
         # Make room for one bit (* 2) and store the side to move in it.
-        return (position << 1) | (0 if turn == RED else 1)
+        return (position << 1) | (0 if turn == BLUE else 1)
 
     def unhash(self, position: int) -> tuple[list[int], int]:
         """
@@ -605,14 +674,14 @@ class Clusterfuss(Game):
         352 % 10 = 2 and 352 // 10 = 35 in decimal.
 
         Example, 104:
-            104 & 1 = 0 -> Red to move;  104 >> 1 = 52
-            52 % 3 = 1, 52 // 3 = 17  -> board[0] = RED
-            17 % 3 = 2, 17 // 3 = 5   -> board[1] = BLUE
-             5 % 3 = 2,  5 // 3 = 1   -> board[2] = BLUE
-             1 % 3 = 1,  1 // 3 = 0   -> board[3] = RED
+            104 & 1 = 0 -> Blue to move;  104 >> 1 = 52
+            52 % 3 = 1, 52 // 3 = 17  -> board[0] = BLUE
+            17 % 3 = 2, 17 // 3 = 5   -> board[1] = RED
+             5 % 3 = 2,  5 // 3 = 1   -> board[2] = RED
+             1 % 3 = 1,  1 // 3 = 0   -> board[3] = BLUE
         """
         # Lowest bit is the side to move (& 1 is % 2); >> 1 (// 2) drops it.
-        turn = BLUE if position & 1 else RED
+        turn = RED if position & 1 else BLUE
         position >>= 1
         # Cells come out in index order because cell 0 is the lowest digit.
         board = []
