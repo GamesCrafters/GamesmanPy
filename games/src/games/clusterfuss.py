@@ -39,7 +39,10 @@ STRING FORMATS
                          number 1.. bottom to top.  Directions are udlr
                          (u up, d down, l left, r right).  A skip is '-'.
     AUTOGUI              position '1_' (Blue to move) or '2_' (Red) + cells;
-                         move 'M_<source index>_<target index>_x', skip 'M_skip'.
+                         move 'M_<source index>_<target index>_x'.  A skip is
+                         the pass-turn button 'A_P_<2 * n_cells>_-', whose
+                         centre sits below the board after the cell centres
+                         and the selection layer's (see AUTOGUI selection).
 
     Two-click moves (half moves, used by the web UI only):
     Selected position    Readable position + '_' + the selected square, e.g.
@@ -300,7 +303,9 @@ class Clusterfuss(Game):
         Returns a string representation of the move based on the given mode.
         """
         if move == self._skip_move:
-            return 'M_skip' if mode == StringMode.AUTOGUI else SKIP_STRING
+            if mode == StringMode.AUTOGUI:
+                return f'A_P_{2 * self._n_cells}_-'
+            return SKIP_STRING
         if move >= self._deselect_move_base:
             index = move - self._deselect_move_base
             if mode == StringMode.AUTOGUI:
