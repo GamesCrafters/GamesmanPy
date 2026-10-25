@@ -95,11 +95,6 @@ def get_pos(game_id: str, variant_id: str):
                     "autoguiMove": game.move_to_string(half_move, StringMode.AUTOGUI),
                     "moveValue": value_to_string(half_move_val)
                 }
-                # An incomplete move (e.g. selecting a piece) keeps the same
-                # real position, so the frontend should not record it as a
-                # separate move in its history.
-                if half_move not in move_dict:
-                    item["partMove"] = True
                 if game.n_players == 1:
                     if half_pos_val == Value.Win:
                         item["remoteness"] = half_pos_rem
