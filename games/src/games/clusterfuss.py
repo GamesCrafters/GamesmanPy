@@ -1,5 +1,6 @@
 """
 Clusterfuss, by Mark Steere (July 2023).  https://marksteeregames.com
+Implemented by Kai Chen and Matthew Lee.
 
 Two players, Blue and Red, on a rows x cols board initially filled with
 checkers in a checkerboard pattern.  On an odd x odd board the centre square is
