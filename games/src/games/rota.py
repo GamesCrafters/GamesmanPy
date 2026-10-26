@@ -231,9 +231,9 @@ class Rota(Game):
         source , destination = self._decode_move(move)
         if mode == StringMode.AUTOGUI:
             if source == None:
-                return f'A_-_{destination}'
+                return f'A_-_{destination}_x'
             else:
-                return f'M_{source}_{destination}'
+                return f'M_{source}_{destination}_x'
         if source == None:
             return f'{destination}'
         else:
