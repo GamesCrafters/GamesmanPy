@@ -326,17 +326,24 @@ class Bug(Game):
             raise ValueError(f"move {move} is for player {s[0]}, but player {player} is to move")
         tiles = [perm[int(s[i:i + 2]) - 1] for i in range(1, len(s), 2)]
         changes = [(tiles[0], player)]
+
+        def eat_now():  # the eater's victims are removed right away, together with the tile that triggers it
+            nonlocal opp
+            e = next_eater(own, opp)
+            if e is not None:
+                changes.extend((c, 0) for c in range(N) if e[1] >> c & 1)
+                opp &= ~e[1]
+            return e
+
         own |= 1 << tiles[0]
+        eat = eat_now()
         for g in tiles[1:]:
-            eat = next_eater(own, opp)
             if eat is None or not eat[2] >> g & 1:
                 raise ValueError(f"move {move} is not legal from position {position}")
-            _, removed, _ = eat
-            changes += [(c, 0) for c in range(N) if removed >> c & 1]
-            opp &= ~removed
             own |= 1 << g
             changes.append((g, player))
-        if not partial and next_eater(own, opp) is not None:
+            eat = eat_now()
+        if not partial and eat is not None:
             raise ValueError(f"move {move} stops before the eating chain is finished")
         return unmap(t, own), unmap(t, opp), [(inv[c], v) for c, v in changes]
 
@@ -421,13 +428,16 @@ class Bug(Game):
             currentPlayer = 'BLACK ⚫' if len(str(position)) <20 else 'WHITE ⚪'
 
             return "\n".join("".join(row).rstrip() for row in canvas) + f'\n\n Current player: {currentPlayer} \n'
-        elif mode == StringMode.AUTOGUI:
+        if mode == StringMode.AUTOGUI:
             parent, tiles = _split(position)
             player, w, b = decode(parent)
             if tiles:                                    # mid-turn: apply the tiles chosen so far
                 own, opp, _ = self._replay(parent, int(str(player) + "".join(f"{t:02d}" for t in tiles)), partial=True)
                 w, b = (own, opp) if player == 1 else (opp, own)
             return f"{player}_" + "".join('w' if w >> i & 1 else 'b' if b >> i & 1 else '-' for i in range(N))
+
+        return str(position)
+    
     def from_string(self, strposition: str) -> int:
         """
         Returns the position from a string representation of the position.
