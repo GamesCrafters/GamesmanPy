@@ -428,6 +428,7 @@ class Bug(Game):
                 own, opp, _ = self._replay(parent, int(str(player) + "".join(f"{t:02d}" for t in tiles)), partial=True)
                 w, b = (own, opp) if player == 1 else (opp, own)
             return f"{player}_" + "".join('w' if w >> i & 1 else 'b' if b >> i & 1 else '-' for i in range(N))
+    
     def from_string(self, strposition: str) -> int:
         """
         Returns the position from a string representation of the position.
@@ -449,8 +450,7 @@ class Bug(Game):
         elif mode == StringMode.AUTOGUI:
             # will generate only a circle at each move in current_half_moves (see below)
             # need to turn move into its associated center
-            moveint_to_centerspos = {11:0, 12:1, 13:2, 21:3, 22:4, 23:5, 24:6, 31:7, 32:8, 33:9, 34:10, 35:11, 41:12, 42:13, 43:14, 44:15, 51:16, 52:17, 53:18}
-            center_i = moveint_to_centerspos[move]
+            center_i = move -1
             return f"A_-_{center_i}_-"
         
         else:
