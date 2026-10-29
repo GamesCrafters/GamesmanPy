@@ -441,7 +441,9 @@ class Bug(Game):
             return " ".join(self.LABELS[int(s[i:i+2]) - 1] for i in range(0, len(s), 2))
         elif mode == StringMode.AUTOGUI:
             # will generate only a circle at each move in current_half_moves (see below)
-            center_i = "TODO"
+            # need to turn move into its associated center
+            moveint_to_centerspos = {11:0, 12:1, 13:2, 21:3, 22:4, 23:5, 24:6, 31:7, 32:8, 33:9, 34:10, 35:11, 41:12, 42:13, 43:14, 44:15, 51:16, 52:17, 53:18}
+            center_i = moveint_to_centerspos[move]
             return f"A_-_{center_i}_-"
         
         else:
