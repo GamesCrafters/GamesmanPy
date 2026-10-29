@@ -421,7 +421,7 @@ class Bug(Game):
             currentPlayer = 'BLACK ⚫' if len(str(position)) <20 else 'WHITE ⚪'
 
             return "\n".join("".join(row).rstrip() for row in canvas) + f'\n\n Current player: {currentPlayer} \n'
-        if mode == StringMode.AUTOGUI:
+        elif mode == StringMode.AUTOGUI:
             parent, tiles = _split(position)
             player, w, b = decode(parent)
             if tiles:                                    # mid-turn: apply the tiles chosen so far
