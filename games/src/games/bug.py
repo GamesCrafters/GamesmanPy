@@ -314,7 +314,7 @@ class Bug(Game):
         own, opp, _ = self._replay(position, move)
         return encode(2, own, opp) if player == 1 else encode(1, opp, own)
 
-    def _replay(self, position: int, move: int):
+    def _replay(self, position: int, move: int, partial=False):
         """Apply a move tile by tile. Returns (own, opp, changes) where changes lists
         (cell, new value) in the order they happen."""
         player, w, b = decode(position)
@@ -336,7 +336,7 @@ class Bug(Game):
             opp &= ~removed
             own |= 1 << g
             changes.append((g, player))
-        if next_eater(own, opp) is not None:
+        if not partial and next_eater(own, opp) is not None:
             raise ValueError(f"move {move} stops before the eating chain is finished")
         return unmap(t, own), unmap(t, opp), [(inv[c], v) for c, v in changes]
 
