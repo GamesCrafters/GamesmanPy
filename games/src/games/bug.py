@@ -160,6 +160,20 @@ def encode(player: int, w: int, b: int) -> int:
     v = int(format(w, 'b')) + 2 * int(format(b, 'b'))
     return v + 10**19 if player == 1 else v
 
+def _tiles(move: int) -> list[int]:
+    """Tile numbers in a move (or in a mid-turn prefix): the digit after the player digit, in pairs."""
+    s = str(move)
+    return [int(s[i:i + 2]) for i in range(1, len(s), 2)]
+
+def _split(position: int):
+    """position -> (position the turn started from, tiles chosen so far).
+    A position longer than 20 digits is mid-turn: the move so far (player digit + 2-digit tiles)
+    followed by the starting position zero-padded to 20 digits."""
+    s = str(position)
+    if len(s) <= 20:
+        return position, []
+    return int(s[-20:]), _tiles(int(s[:-20]))
+
 def placements(own: int, opp: int) -> list[int]:
     """Cells the player may place on: empty, not touching two of their own bugs, and not growing
     a bug beyond the largest bug on the board."""
@@ -233,6 +247,7 @@ class Bug(Game):
     variants = ["regular", "test"]
     n_players = 2
     cyclic = False
+    uses_half_moves = True
 
     def __init__(self, variant_id: str):
         """
@@ -284,6 +299,7 @@ class Bug(Game):
         """
         Returns the list of legal moves from the input position.
         """
+        position, _ = _split(position)
         self._expand(position)
         return list(self._cache_moves)
 
@@ -291,6 +307,7 @@ class Bug(Game):
         """
         Returns the resulting position of applying move to position.
         """
+        position, _ = _split(position)
         if position == self._cache_pos and move in self._cache_children:
             return self._cache_children[move]
         player, w, b = decode(position)
@@ -339,6 +356,7 @@ class Bug(Game):
         base-3 number, times 2, plus 1 if it is player 1's turn. Always below 2.4 billion, so it
         fits in a SQLite INTEGER (a raw position can be up to 1.2 * 10^19, which does not).
         """
+        position, _ = _split(position)
         player, w, b = decode(position)
         _, cw, cb = canonical(w, b)
         board = POW3_LO[cw & 1023] + POW3_HI[cw >> 10] + 2 * (POW3_LO[cb & 1023] + POW3_HI[cb >> 10])
@@ -379,6 +397,7 @@ class Bug(Game):
         """
         if mode != StringMode.TUI:
                 return str(position)
+        position, _ = _split(position)
         digits = str(position).zfill(20)[-19:][::-1]
         P, H = 10, 4
         edge = "'-._____.-"
@@ -416,45 +435,44 @@ class Bug(Game):
         Returns a string representation of the move based on the given mode.
         """
         if mode == StringMode.TUI:
+            if move < 100:                        # half move: a single tile number
+                return self.LABELS[move - 1]
             s = str(move)[1:]                     # drop the player digit
             return " ".join(self.LABELS[int(s[i:i+2]) - 1] for i in range(0, len(s), 2))
         elif mode == StringMode.AUTOGUI:
             # will generate only a circle at each move in current_half_moves (see below)
-            return f"A_-_{move}_-"
+            center_i = "TODO"
+            return f"A_-_{center_i}_-"
         
         else:
             return str(move)
 
-    # list of all moves possible at the start of the turn. will gradually remove/whittle down moves until list is empty, then return position
-    movesRemaining = [999]
-    #using this to understand what the prev position looked like, so I know what move was picked
-    movePicked = 0
-    
-    def generate_half_moves(self, position:int):
-        #initialize movesRemaining list if this is the first halfmove. I'm using 999 as a unique flag
-        if Bug.movesRemaining == [999]:
-            Bug.movesRemaining = Bug.generate_moves(self, position)
+    def generate_half_moves(self, position: int) -> list[int]:
+        """Next tile numbers available from this (possibly mid-turn) position."""
+        parent, tiles = _split(position)
+        n, out = len(tiles), []
+        for m in self.generate_moves(parent):
+            ts = _tiles(m)
+            if ts[:n] == tiles and ts[n] not in out:
+                out.append(ts[n])
+        return out
 
-        #if there are no moves left, return the position, this will end the half_moves chain
-        elif Bug.movesRemaining == []:
-            return position
-            
-        #if this is not the first time. according to move picked, update list accordingly. remove all moves that are no longer possible. cut the used move out of remaining moves.
-        else:
-            updatedMovesRemaining = []
-            for move in Bug.movesRemaining:
-                if int(str(move)[0:2]) == Bug.movePicked:
-                    updatedMovesRemaining.append(int(str(move)[2:]))
-            Bug.movesRemaining = updatedMovesRemaining
-    
-        #define the moves available at this specific point in time
-        current_half_moves = []
+    def do_half_move(self, position: int, half_move: int, move_dict: dict):
+        """Returns (new position, move value, position remoteness, position value).
+        Mid-turn positions keep the parent's remoteness/value; a finished turn returns the real child."""
+        parent, tiles = _split(position)
+        new = tiles + [half_move]
+        match = {m: rv for m, rv in move_dict.items() if _tiles(m)[:len(new)] == new}
+        if len(match) == 1:
+            (m, (rem, val)), = match.items()
+            if len(_tiles(m)) == len(new):
+                return self.do_move(parent, m), (Value.Win if val == Value.Loss else Value.Loss), rem, val
 
-        for move in Bug.movesRemaining:
-            current_half_moves.append(int(str(move)[0:2]))
-
-        return current_half_moves
-
-    def do_half_move(self, position:int, move:int):
-        Bug.movePicked = move
-        return Bug.do_move(self, position, move)
+        def best(group):  # children's (rem, val) -> mover's (rem, val)
+            loses = [r for r, v in group if v == Value.Loss]
+            return (min(loses) + 1, Value.Win) if loses else (max(r for r, _ in group) + 1, Value.Loss)
+        rem, val = best(move_dict.values())
+        _, move_val = best(match.values())
+        player = decode(parent)[0]
+        mid = int(str(player) + "".join(f"{t:02d}" for t in new) + str(parent).zfill(20))
+        return mid, move_val, rem, val
