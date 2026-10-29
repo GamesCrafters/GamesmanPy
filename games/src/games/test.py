@@ -5,7 +5,7 @@ class Test(Game):
     id = 'test'
     variants = ["regular"]
     n_players = 1
-    cyclic = Falsefa
+    cyclic = False
 
     def __init__(self, variant_id: str):
         """
