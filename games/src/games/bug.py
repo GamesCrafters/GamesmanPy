@@ -395,34 +395,39 @@ class Bug(Game):
         """
         Returns a string representation of the position based on the given mode.
         """
-        if mode != StringMode.TUI:
-                return str(position)
-        position, _ = _split(position)
-        digits = str(position).zfill(20)[-19:][::-1]
-        P, H = 10, 4
-        edge = "'-._____.-"
-        canvas = [[' '] * (P * 5 + 1) for _ in range(H * 5 + 1)]
-        t = 0
-        for r, n in enumerate(self.ROWS):
-            y, x0 = r * H, (5 - n) * P // 2
-            for c in range(n):
-                x = x0 + c * P
-                e = [self.FILL[digits[t]], '']      # one emoji = 2 columns
-                solid = ['|'] + e*2 + [' '] + e*2 + ['|']
-                label = ['|'] + e + list(f" {self.LABELS[t]:^3} ") + e + ['|']
-                canvas[y+1][x:x+P+1] = solid
-                canvas[y+2][x:x+P+1] = label
-                canvas[y+3][x:x+P+1] = solid
-                cx = x + P // 2
-                for i in range(P + 1):
-                    canvas[y][x+i]   = edge[(x + i - cx) % P]
-                    canvas[y+H][x+i] = edge[(x + i - cx + P//2) % P]
-                t += 1
+        if mode == StringMode.TUI:
+            position, _ = _split(position)
+            digits = str(position).zfill(20)[-19:][::-1]
+            P, H = 10, 4
+            edge = "'-._____.-"
+            canvas = [[' '] * (P * 5 + 1) for _ in range(H * 5 + 1)]
+            t = 0
+            for r, n in enumerate(self.ROWS):
+                y, x0 = r * H, (5 - n) * P // 2
+                for c in range(n):
+                    x = x0 + c * P
+                    e = [self.FILL[digits[t]], '']      # one emoji = 2 columns
+                    solid = ['|'] + e*2 + [' '] + e*2 + ['|']
+                    label = ['|'] + e + list(f" {self.LABELS[t]:^3} ") + e + ['|']
+                    canvas[y+1][x:x+P+1] = solid
+                    canvas[y+2][x:x+P+1] = label
+                    canvas[y+3][x:x+P+1] = solid
+                    cx = x + P // 2
+                    for i in range(P + 1):
+                        canvas[y][x+i]   = edge[(x + i - cx) % P]
+                        canvas[y+H][x+i] = edge[(x + i - cx + P//2) % P]
+                    t += 1
 
-        currentPlayer = 'BLACK ⚫' if len(str(position)) <20 else 'WHITE ⚪'
+            currentPlayer = 'BLACK ⚫' if len(str(position)) <20 else 'WHITE ⚪'
 
-        return "\n".join("".join(row).rstrip() for row in canvas) + f'\n\n Current player: {currentPlayer} \n'
-
+            return "\n".join("".join(row).rstrip() for row in canvas) + f'\n\n Current player: {currentPlayer} \n'
+        if mode == StringMode.AUTOGUI:
+            parent, tiles = _split(position)
+            player, w, b = decode(parent)
+            if tiles:                                    # mid-turn: apply the tiles chosen so far
+                own, opp, _ = self._replay(parent, int(str(player) + "".join(f"{t:02d}" for t in tiles)), partial=True)
+                w, b = (own, opp) if player == 1 else (opp, own)
+        return f"{player}_" + "".join('w' if w >> i & 1 else 'b' if b >> i & 1 else '-' for i in range(N))
     def from_string(self, strposition: str) -> int:
         """
         Returns the position from a string representation of the position.
