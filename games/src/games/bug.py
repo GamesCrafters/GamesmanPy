@@ -433,6 +433,8 @@ class Bug(Game):
         Returns the position from a string representation of the position.
         Input string is StringMode.Readable.
         """
+        if strposition == 'null':
+            return 10**19 # 1 and 19 zeroes !
         return int(strposition)
 
     def move_to_string(self, move: int, mode: StringMode) -> str:
