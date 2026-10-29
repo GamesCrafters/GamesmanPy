@@ -428,6 +428,8 @@ class Bug(Game):
                 own, opp, _ = self._replay(parent, int(str(player) + "".join(f"{t:02d}" for t in tiles)), partial=True)
                 w, b = (own, opp) if player == 1 else (opp, own)
             return f"{player}_" + "".join('w' if w >> i & 1 else 'b' if b >> i & 1 else '-' for i in range(N))
+        else:
+            return str(position)
     def from_string(self, strposition: str) -> int:
         """
         Returns the position from a string representation of the position.
