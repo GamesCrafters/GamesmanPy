@@ -54,13 +54,12 @@ STRING FORMATS
                          'x'/'o', so GamesmanUni's simpleSlides animation still
                          slides it when the capture is played.  The AUTOGUI
                          theme repeats the cell centres for this layer.
-    Select / deselect    Readable: the square, e.g. 'a2'; deselect '~a2'.
-                         AUTOGUI: a circle button 'A_-_<index>_-' on the square.
-                         Clicking the selected checker again deselects it.
+    Select               Readable: the square, e.g. 'a2'.  AUTOGUI: a circle
+                         button 'A_-_<index>_-' on the square.
     Second click         an ordinary capture 'M_<source>_<target>_x' from the
-                         selected checker.  A square the selected checker can
-                         capture shows only that capture, so to select a
-                         friendly checker there instead, deselect first.
+                         selected checker; these are the only buttons once a
+                         checker is selected.  To pick another checker, undo
+                         the selection, as in GamesmanClassic's multipart moves.
 
 
 DATA REPRESENTATION
@@ -105,9 +104,8 @@ DATA REPRESENTATION
                  The solver never sees a selection; the database only stores
                  plain positions.
 
-    Half move    Moves numbered after the skip: select square i is
-                 ((n_cells + 1) << 2) + i, deselect square i is that base plus
-                 n_cells + i.  Both are above every capture and the skip.
+    Half move    Select square i is ((n_cells + 1) << 2) + i, above every
+                 capture and the skip.
 """
 
 import os
@@ -198,7 +196,6 @@ class Clusterfuss(Game):
         # Two-click (half move) encodings; see Selection and Half move above.
         self._select_base = 2 * 3 ** self._n_cells
         self._select_move_base = (self._n_cells + 1) << 2
-        self._deselect_move_base = self._select_move_base + self._n_cells
 
     # ------------------------------------------------------------------
     # Game interface
@@ -307,11 +304,6 @@ class Clusterfuss(Game):
             if mode == StringMode.AUTOGUI:
                 return f'A_P_{2 * self._n_cells}_-'
             return SKIP_STRING
-        if move >= self._deselect_move_base:
-            index = move - self._deselect_move_base
-            if mode == StringMode.AUTOGUI:
-                return f'A_-_{index}_-'
-            return '~' + self.square_name(index)
         if move >= self._select_move_base:
             index = move - self._select_move_base
             if mode == StringMode.AUTOGUI:
@@ -341,22 +333,17 @@ class Clusterfuss(Game):
     def generate_half_moves(self, position: int) -> list[int]:
         """
         Returns the buttons the web UI shows.  With nothing selected: select
-        any checker that has a legal capture.  With a checker selected: its
-        captures, deselect it (click it again), and select another checker,
-        except on squares it can capture (one click there means the capture).
-        A skip is shown as-is.
+        any checker that has a legal capture.  With a checker selected: only
+        its captures.  A skip is shown as-is.
         """
         moves = self.generate_moves(position)
         if moves == [self._skip_move]:
             return moves
         selected = self.selection(position)
-        sources = sorted({move >> 2 for move in moves})
-        half_moves = [move for move in moves if move >> 2 == selected]
-        targets = {self.step(*self.decode_move(move)) for move in half_moves}
         if selected is not None:
-            half_moves.append(self._deselect_move_base + selected)
-        return half_moves + [self._select_move_base + index for index in sources
-                             if index != selected and index not in targets]
+            return [move for move in moves if move >> 2 == selected]
+        return [self._select_move_base + index
+                for index in sorted({move >> 2 for move in moves})]
 
     def do_half_move(self, position: int, move: int,
                      move_dict: dict[int, tuple[int, Value]]):
@@ -365,23 +352,19 @@ class Clusterfuss(Game):
         server, or four Nones if the move leads nowhere solved.  `move_dict`
         maps each full move to its child's (remoteness, value).
 
-        A capture or skip reports its child as usual.  A select or deselect
-        keeps the same side to move, so it reports the best child still
-        reachable from the new selection, as if the mover played it next.
+        A capture or skip reports its child as usual.  A select keeps the same
+        side to move, so it reports the best child still reachable from the
+        selected checker, as if the mover played it next.
         """
         if move < self._select_move_base:
             if move not in move_dict:
                 return (None, None, None, None)
             (remoteness, value) = move_dict[move]
             return (self.do_move(position, move), _flip(value), remoteness, value)
-        if move >= self._deselect_move_base:
-            children = list(move_dict.values())
-            new_position = self.hash_ext(position)
-        else:
-            index = move - self._select_move_base
-            children = [child for (full_move, child) in move_dict.items()
-                        if full_move >> 2 == index]
-            new_position = self.hash_ext(position) + (index + 1) * self._select_base
+        index = move - self._select_move_base
+        children = [child for (full_move, child) in move_dict.items()
+                    if full_move >> 2 == index]
+        new_position = self.hash_ext(position) + (index + 1) * self._select_base
         if not children:
             return (None, None, None, None)
         (remoteness, value) = min(children, key=_child_preference)
