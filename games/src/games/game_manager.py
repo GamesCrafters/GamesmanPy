@@ -1,5 +1,6 @@
 from .chipschallenge import ChipsChallenge
 from .clobber import Clobber
+from .clusterfuss import Clusterfuss
 from .flowfree import FlowFree
 from .hashi import Hashi
 from .horses import Horses
@@ -17,6 +18,7 @@ from models import *
 game_list = {
     "chipschallenge": ChipsChallenge,
     "clobber": Clobber,
+    "clusterfuss": Clusterfuss,
     "flowfree": FlowFree,
     "hashi": Hashi,
     "horses": Horses,    
