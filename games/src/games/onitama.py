@@ -55,10 +55,14 @@ Red Queued Card: {self.card_in_queue_for_red}
     #     return False
 
 class OnitamaMove:
-    def __init__(self, starting_square, ending_square, card_used):
+    def __init__(self, starting_square, ending_square, card_used, player = None, card_slot = None):
         self.starting_square = starting_square
         self.ending_square = ending_square
         self.card_used = card_used
+        # which player made the move, and which of their two cards (0 or 1, in sorted order) was used;
+        # only needed to build the AutoGUI move string
+        self.player = player
+        self.card_slot = card_slot
 
     def __repr__(self):
         col_lut = {0: 'a', 1: 'b', 2: 'c'}
@@ -114,6 +118,7 @@ class Onitama(Game):
         else:
             movable_pieces = {'P', 'M'}
             active_player_cards = position.blue_cards
+        card_slots = {card: i for i, card in enumerate(sorted(active_player_cards))}
 
         for card in active_player_cards:
             for move in Onitama.cards_3x3[card].moves:
@@ -126,12 +131,12 @@ class Onitama(Game):
                         if position.board[row][col] in movable_pieces:
                             if new_row >= 0 and new_row < board_row_count and new_col >= 0 and new_col < board_col_count:
                                 if position.board[new_row][new_col] not in movable_pieces:
-                                    valid_moves.append(OnitamaMove((row, col), (new_row, new_col), card))
+                                    valid_moves.append(OnitamaMove((row, col), (new_row, new_col), card, position.active_player, card_slots[card]))
 
         # edge case where no move is possible
         if valid_moves == []:
             for card in active_player_cards:
-                valid_moves.append(OnitamaMove((0, 0), (0, 0), card))
+                valid_moves.append(OnitamaMove((0, 0), (0, 0), card, position.active_player, card_slots[card]))
 
         return valid_moves
     
@@ -206,23 +211,79 @@ class Onitama(Game):
                 return Value.Win
 
 
+    # AutoGUI center layout (must match get_onitama in GamesCraftersUWAPI's image_autogui_data.py):
+    #   0-8:   board squares, row-major
+    #   9-11:  blue hand left, blue hand right, blue queued card
+    #   12-14: red hand left, red hand right, red queued card
+    #   15-32: arrow targets, a left and a right one per square for the left and right hand card,
+    #          so moves to the same square with different cards don't overlap
+    autogui_blue_slots = 9
+    autogui_red_slots = 12
+    autogui_arrow_targets = 15
+    # card image characters; red's cards are lowercase, blue's are uppercase (drawn flipped,
+    # since blue's moves are rotated 180 degrees on the board)
+    autogui_card_chars = {'horse': 'h', 'goose': 'g', 'elephant': 'e', 'mantis': 'n', 'rat': 'r'}
+
     def to_string(self, position: OnitamaPosition, mode: StringMode) -> str:
         """
         Returns a string representation of the position based on the given mode.
+        Readable is <active player>_<red cards>_<blue cards>_<queued card>_<board>,
+        e.g. r_goose-horse_mantis-rat_elephant_PMP---pmp
         """
+        board = ''.join('-' if piece == '' else piece for row in position.board for piece in row)
+        if mode == StringMode.Readable:
+            queued_card = position.card_in_queue_for_red or position.card_in_queue_for_blue
+            return '_'.join([
+                position.active_player[0],
+                '-'.join(sorted(position.red_cards)),
+                '-'.join(sorted(position.blue_cards)),
+                queued_card,
+                board,
+            ])
+        elif mode == StringMode.AUTOGUI:
+            card_slots = ''
+            for hand, queued_card, is_blue in ((position.blue_cards, position.card_in_queue_for_blue, True),
+                                               (position.red_cards, position.card_in_queue_for_red, False)):
+                for card in sorted(hand) + [queued_card]:
+                    if card is None:
+                        card_slots += '-'
+                    else:
+                        char = Onitama.autogui_card_chars[card]
+                        card_slots += char.upper() if is_blue else char
+            turn = '1' if position.active_player == 'red' else '2'
+            arrow_targets = '-' * (2 * len(board))
+            return f"{turn}_{board}{card_slots}{arrow_targets}"
         return repr(position)
 
-    def from_string(self, strposition: str) -> int:
+    def from_string(self, strposition: str) -> OnitamaPosition:
         """
         Returns the position from a string representation of the position.
         Input string is StringMode.Readable.
         """
-        pass
+        active_player, red_cards, blue_cards, queued_card, board_string = strposition.split('_')
+        pieces = ['' if char == '-' else char for char in board_string]
+        board = [pieces[0:3], pieces[3:6], pieces[6:9]]
+        pos = OnitamaPosition(set(red_cards.split('-')), set(blue_cards.split('-')), board)
+        if active_player == 'r':
+            pos.active_player = 'red'
+            pos.card_in_queue_for_red = queued_card
+        else:
+            pos.active_player = 'blue'
+            pos.card_in_queue_for_blue = queued_card
+        return pos
 
-    def move_to_string(self, move: int, mode: StringMode) -> str:
+    def move_to_string(self, move: OnitamaMove, mode: StringMode) -> str:
         """
         Returns a string representation of the move based on the given mode.
         """
+        if mode == StringMode.AUTOGUI:
+            hand_start = Onitama.autogui_red_slots if move.player == 'red' else Onitama.autogui_blue_slots
+            if move.starting_square == move.ending_square:
+                # no piece can move, so the move is just giving up a card: click that card
+                return f"A_-_{hand_start + move.card_slot}_x"
+            from_square = move.starting_square[0] * 3 + move.starting_square[1]
+            to_square = move.ending_square[0] * 3 + move.ending_square[1]
+            return f"M_{from_square}_{Onitama.autogui_arrow_targets + 2 * to_square + move.card_slot}_x"
         return repr(move)
 
     def hash_ext(self, position: OnitamaPosition) -> int:
