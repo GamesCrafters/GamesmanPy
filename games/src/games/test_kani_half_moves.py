@@ -1,7 +1,7 @@
 
 from kaninariebi import KaniNariEbi
 
-variants = ("regular", "mixed", "3x5", "5x3")
+variants = KaniNariEbi.variants
 
 for variant in variants:
     game = KaniNariEbi(variant)

@@ -6,7 +6,18 @@ import json
 
 class KaniNariEbi(Game):
     id = 'kaninariebi'
-    variants = ["regular", "mixed", "3x5", "5x3"]
+    # Keep existing IDs stable; dimensions are rows x columns.
+    _VARIANTS = {
+        "regular": (5, 5, False),
+        "mixed": (5, 5, True),
+        "3x5": (3, 5, False),
+        "5x3": (5, 3, False),
+        "4x5": (4, 5, False),
+        "3x5-mixed": (3, 5, True),
+        "4x5-mixed": (4, 5, True),
+        "5x3-mixed": (5, 3, True),
+    }
+    variants = list(_VARIANTS)
     n_players = 2
     cyclic = True
 
@@ -573,11 +584,10 @@ class KaniNariEbi(Game):
         if variant_id not in self.variants:
             raise ValueError("Variant not defined")
         self._variant_id = variant_id
-        self._ROWS = 3 if variant_id == "3x5" else 5
-        self._COLS = 3 if variant_id == "5x3" else 5
+        self._ROWS, self._COLS, self._MIXED_BONDING = self._VARIANTS[variant_id]
         self._BOARD_SIZE = self._ROWS * self._COLS
         self._INITIAL_PIECES = self._ROWS
-        self._WIN_COUNT = 2 if variant_id == "3x5" else 3
+        self._WIN_COUNT = (self._ROWS + 1) // 2
         self._CURRENT_COL = self._COLS // 2
 
     def start(self) -> int:
@@ -633,8 +643,8 @@ class KaniNariEbi(Game):
 
                     # Bond is checked AFTER sea current and promotion.
                     # Exact-piece equality means only same-type Bonding.
-                    # Checks _variant_id to see if Mixed Bonding is enabled
-                    if self._variant_id == "mixed":
+                    # Select the bonding rule independently of board dimensions
+                    if self._MIXED_BONDING:
                         bond_group = self._mixed_bond_group(after_landing, final_square)
                     else:
                         bond_group = self._same_type_bond_group(after_landing, final_square)
@@ -787,7 +797,7 @@ class KaniNariEbi(Game):
             )
 
             # AutoGUI sees only the visible board.
-        if mode == StringMode.AUTOGUI:
+        if mode == StringMode.AUTOGUI or mode == StringMode.Readable:
             # Reserve one empty character for each UI action center.
             return f"{turn}_{chars}" + "-" * len(self._WEB_ACTIONS)
 
