@@ -20,6 +20,7 @@ class KaniNariEbi(Game):
     variants = list(_VARIANTS)
     n_players = 2
     cyclic = True
+    uses_half_moves = True
 
     # Initialization Helper Variables:
     _ROWS = 5
@@ -783,6 +784,7 @@ class KaniNariEbi(Game):
     # hash current position into printable String board representation
 
 
+    
     def to_string(self, position, mode: StringMode) -> str:
         original, prefix = self._half_state(position)
         board, turn = self._unhash_position(original)
@@ -801,8 +803,6 @@ class KaniNariEbi(Game):
             # Reserve one empty character for each UI action center.
             return f"{turn}_{chars}" + "-" * len(self._WEB_ACTIONS)
 
-            # Readable retains the ORIGINAL board plus
-            # the selected steps, so the state is recoverable.
             original_board, _ = self._unhash_position(original)
             original_chars = "".join(
                 self._WEB_PIECE_TO_CHAR[piece]
@@ -818,6 +818,7 @@ class KaniNariEbi(Game):
 
         if mode == StringMode.TUI:
             chars = self._board_to_chars(board)
+
             rows = [
                 f"{self._ROWS - r} "
                 + chars[r * self._COLS:(r + 1) * self._COLS]
@@ -829,11 +830,13 @@ class KaniNariEbi(Game):
                 for col in range(self._COLS)
             )
 
-            return f"  {columns}\n" + "\n".join(rows) + f"\nTurn: {turn}"
+            return (
+                f"  {columns}\n"
+                + "\n".join(rows)
+                + f"\nTurn: {turn}"
+            )
 
         raise ValueError("Unsupported StringMode")
-
-    # unhash String board representation to the actual position
 
     def from_string(self, strposition: str):
         """
@@ -1239,18 +1242,18 @@ class KaniNariEbi(Game):
                         raise ValueError("Invalid current direction")
 
                     center = self._web_action_center(action)
-                    return f"T_{action}_{center}_-"
+                    return f"A_{action[0]}_{center}_-"
 
                 # Promotion choice
                 if kind in ("promote", "bond_promote"):
                     action = "YES" if move[1] else "NO"
                     center = self._web_action_center(action)
-                    return f"T_{action}_{center}_-"
+                    return f"A_{action[0]}_{center}_-"
 
                 # Finish the turn without Bond
                 if kind == "end":
                     center = self._web_action_center("END")
-                    return f"T_END_{center}_-"
+                    return f"A_E_{center}_-"
 
                 raise ValueError(f"Unknown half-move type: {kind}")
 

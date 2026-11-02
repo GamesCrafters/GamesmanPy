@@ -59,6 +59,7 @@ def get_pos(game_id: str, variant_id: str):
         case Err(error): abort(404, description=error)
     game = _game(variant_id)
     pos = game.from_string(stringpos)
+    root_pos = game.hash_ext(pos) if game.uses_half_moves else pos
     db = SqliteDB(game_id, variant_id)
     hashed_pos = game.hash_ext(pos)
     entry = db.get(hashed_pos)
@@ -68,14 +69,14 @@ def get_pos(game_id: str, variant_id: str):
 
     moves = []
 
-    if game.primitive(pos) is None:
-        moves =  game.generate_moves(pos)
+    if game.primitive(root_pos) is None:
+        moves = game.generate_moves(root_pos)
     
     move_objs = []
     if game.uses_half_moves:
         move_dict = {}
         for move in moves:
-            new_pos = game.do_move(pos, move)
+            new_pos = game.do_move(root_pos, move)
             new_hashed_pos = game.hash_ext(new_pos)
             child = db.get(new_hashed_pos)
             if child is not None:
@@ -87,6 +88,9 @@ def get_pos(game_id: str, variant_id: str):
             # because of a full move, it should return the new remoteness
             new_half_pos, half_move_val, half_pos_rem, half_pos_val = game.do_half_move(pos, half_move, move_dict)
             if new_half_pos is not None:
+                if isinstance(new_half_pos, tuple):
+                    half_pos_rem = rem
+                    half_pos_val = val
                 item = {
                     "position": game.to_string(new_half_pos, StringMode.Readable),
                     "autoguiPosition": game.to_string(new_half_pos, StringMode.AUTOGUI),
