@@ -18,7 +18,7 @@ class OnitamaPosition:
         self.board = board
 
         if neutral_card is not None:
-            neutral_card_color = Onitama.cards_3x3[neutral_card].color
+            neutral_card_color = Onitama.cards_3x4[neutral_card].color
             if neutral_card_color == 'red':
                 self.card_in_queue_for_red = neutral_card
                 self.active_player = 'red' 
@@ -30,29 +30,13 @@ class OnitamaPosition:
         board_string = ''
         for row in self.board:
             board_string += str([' ' if item == '' else item for item in row]) + '\n'
-        return f"""Active Payer: {self.active_player}
-Red Cards: {sorted(list(self.red_cards))}
-Blue Cards: {sorted(list(self.blue_cards))}
-Blue Queued Card: {self.card_in_queue_for_blue}
-Red Queued Card: {self.card_in_queue_for_red}
-==== Board ====
-{board_string}==============="""
-
-    # def __hash__(self):
-    #     return hash(repr(self))
-
-    # def __eq__(self, value):
-    #     if type(value) is not OnitamaPosition:
-    #         return False
-
-    #     if (value.red_cards == self.red_cards and
-    #         value.blue_cards == self.blue_cards and
-    #         value.card_in_queue_for_blue == self.card_in_queue_for_blue and
-    #         value.card_in_queue_for_red == self.card_in_queue_for_red and
-    #         value.board == self.board):
-    #         return True
-
-    #     return False
+        return f"""Active Player: {self.active_player}
+                Red Cards: {sorted(list(self.red_cards))}
+                Blue Cards: {sorted(list(self.blue_cards))}
+                Blue Queued Card: {self.card_in_queue_for_blue}
+                Red Queued Card: {self.card_in_queue_for_red}
+                ==== Board ====
+                {board_string}==============="""
 
 class OnitamaMove:
     def __init__(self, starting_square, ending_square, card_used, player = None, card_slot = None):
@@ -66,7 +50,8 @@ class OnitamaMove:
 
     def __repr__(self):
         col_lut = {0: 'a', 1: 'b', 2: 'c'}
-        row_lut = {0: '3', 1: '2', 2: '1'}
+        # Updated for 4 rows
+        row_lut = {0: '4', 1: '3', 2: '2', 3: '1'}
         if self.starting_square != self.ending_square:
             return f'{self.card_used[0]}{col_lut[self.starting_square[1]]}{row_lut[self.starting_square[0]]}{col_lut[self.ending_square[1]]}{row_lut[self.ending_square[0]]}'
         else:
@@ -74,8 +59,8 @@ class OnitamaMove:
 
 class Onitama(Game):
     id = 'onitama'
-    variants = ["3x3"]
-    cards_3x3 = {
+    variants = ["3x4"]
+    cards_3x4 = {
         'horse': CardInfo([(0, 1), (-1, 0), (0, -1)], 'red'), # up, left, back
         'goose': CardInfo([(-1, 0), (1, 0), (-1, 1), (1, -1)], 'red'), # sideways, left + up, right + down
         'elephant': CardInfo([(-1, 0), (1, 0), (-1, 1), (1, 1)], 'red'), # sideways, pawn capture
@@ -121,7 +106,7 @@ class Onitama(Game):
         card_slots = {card: i for i, card in enumerate(sorted(active_player_cards))}
 
         for card in active_player_cards:
-            for move in Onitama.cards_3x3[card].moves:
+            for move in Onitama.cards_3x4[card].moves:
                 board_row_count = len(position.board)
                 board_col_count = len(position.board[0])
                 for row in range(board_row_count):
@@ -212,13 +197,13 @@ class Onitama(Game):
 
 
     # AutoGUI center layout (must match get_onitama in GamesCraftersUWAPI's image_autogui_data.py):
-    #   0-8:   board squares, row-major
-    #   9-11:  blue hand left, blue hand right, blue queued card
-    #   12-14: red hand left, red hand right, red queued card
+    #   0-11:   board squares, row-major
+    #   12-14:  blue hand left, blue hand right, blue queued card
+    #   15-17:  red hand left, red hand right, red queued card
     # A piece move is S_<card center>_M_<from>_<to>_x: the GUI shows the arrow only after the
     # card at <card center> is clicked (selecting a card is not itself a move).
-    autogui_blue_slots = 9
-    autogui_red_slots = 12
+    autogui_blue_slots = 12 # Updated for 3x4 (12 total squares vs 9)
+    autogui_red_slots = 15
     # card image characters; red's cards are lowercase, blue's are uppercase (drawn flipped,
     # since blue's moves are rotated 180 degrees on the board)
     autogui_card_chars = {'horse': 'h', 'goose': 'g', 'elephant': 'e', 'mantis': 'n', 'rat': 'r'}
@@ -260,7 +245,7 @@ class Onitama(Game):
         """
         active_player, red_cards, blue_cards, queued_card, board_string = strposition.split('_')
         pieces = ['' if char == '-' else char for char in board_string]
-        board = [pieces[0:3], pieces[3:6], pieces[6:9]]
+        board = [pieces[0:3], pieces[3:6], pieces[6:9], pieces[9:12]]
         pos = OnitamaPosition(set(red_cards.split('-')), set(blue_cards.split('-')), board)
         if active_player == 'r':
             pos.active_player = 'red'
@@ -302,7 +287,7 @@ class Onitama(Game):
                 val = 2
             hash_val = hash_val * 3 + val
                 
-        # pieces on the board 5 * 9 bits
+        # pieces on the board 5 * 12 bits 
         for row in position.board:
             for piece in row:
                 hash_val = hash_val * 5 + piece_lut[piece]
@@ -315,11 +300,12 @@ class Onitama(Game):
 
         # board
         board_1d = []
-        for _ in range(9):
+        for _ in range(12): # Updated for 12 board tiles
             board_1d.append(piece_lut[hash_val % 5])
             hash_val //= 5
         board_1d.reverse()
-        board = [board_1d[0:3], board_1d[3:6], board_1d[6:9]]
+        # Reconstruct into 4 rows
+        board = [board_1d[0:3], board_1d[3:6], board_1d[6:9], board_1d[9:12]]
 
         # cards
         red_cards = set()
@@ -350,3 +336,4 @@ class Onitama(Game):
             pos.card_in_queue_for_red = None
             
         return pos
+    
