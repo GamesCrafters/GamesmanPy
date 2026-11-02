@@ -8,17 +8,17 @@ class CardInfo:
         self.color = color
 
 class OnitamaPosition:
-    def __init__(self, red_cards: set[str], blue_cards: set[str], board, neutral_card = None, card_in_queue_for_blue = None, card_in_queue_for_red = None):
+    def __init__(self, red_cards: set[str], blue_cards: set[str], board, cards, neutral_card = None, card_in_queue_for_blue = None, card_in_queue_for_red = None):
         self.active_player = None
         self.red_cards = red_cards
         self.blue_cards = blue_cards
         self.card_in_queue_for_blue = card_in_queue_for_blue
         self.card_in_queue_for_red = card_in_queue_for_red
-
+         
         self.board = board
 
         if neutral_card is not None:
-            neutral_card_color = Onitama.cards_3x4[neutral_card].color
+            neutral_card_color = cards[neutral_card].color
             if neutral_card_color == 'red':
                 self.card_in_queue_for_red = neutral_card
                 self.active_player = 'red' 
@@ -59,13 +59,21 @@ class OnitamaMove:
 
 class Onitama(Game):
     id = 'onitama'
-    variants = ["3x4"]
+    variants = ["3x4", "3x4_balanced"]
     cards_3x4 = {
         'horse': CardInfo([(0, 1), (-1, 0), (0, -1)], 'red'), # up, left, back
         'goose': CardInfo([(-1, 0), (1, 0), (-1, 1), (1, -1)], 'red'), # sideways, left + up, right + down
         'elephant': CardInfo([(-1, 0), (1, 0), (-1, 1), (1, 1)], 'red'), # sideways, pawn capture
         'mantis': CardInfo([(0, -1), (-1, 1), (1, 1)], 'blue'), # down, pawn capture
         'rat': CardInfo([(0, 1), (-1, 0), (1, 1)], 'blue') # up, left, right + down
+    }
+
+    cards_3x4_balanced = {
+        'horse': CardInfo([(0, 2)], 'red'), # up
+        'goose': CardInfo([(0, 1), (1, -1)], 'red'), # up, right + down
+        'elephant': CardInfo([(-1, 0), (1, 0)], 'red'), # sideways
+        'mantis': CardInfo([(0, -1), (-1, 1), (1, 1)], 'blue'), # down, pawn capture
+        'rat': CardInfo([(0, 1), (-1, 0)], 'blue') # up, left
     }
 
     n_players = 2
@@ -78,6 +86,10 @@ class Onitama(Game):
         if variant_id not in Onitama.variants:
             raise ValueError("Variant not defined")
         self._variant_id = variant_id
+        if self._variant_id == "3x4":
+            self.cards = self.cards_3x4
+        else:
+            self.cards = self.cards_3x4_balanced
 
     def start(self) -> str:
         """
@@ -89,7 +101,7 @@ class Onitama(Game):
         board[0] = ['P' if col != board_size[0] // 2 else 'M' for col in range(board_size[0])]
         board[-1] = ['p' if col != board_size[0] // 2 else 'm' for col in range(board_size[0])]
 
-        return OnitamaPosition({'horse', 'goose'}, {'mantis', 'rat'}, board, neutral_card='elephant')
+        return OnitamaPosition({'horse', 'goose'}, {'mantis', 'rat'}, board, self.cards, neutral_card='elephant')
     
     def generate_moves(self, position: OnitamaPosition) -> list[OnitamaMove]:
         """
@@ -106,7 +118,7 @@ class Onitama(Game):
         card_slots = {card: i for i, card in enumerate(sorted(active_player_cards))}
 
         for card in active_player_cards:
-            for move in Onitama.cards_3x4[card].moves:
+            for move in self.cards[card].moves:
                 board_row_count = len(position.board)
                 board_col_count = len(position.board[0])
                 for row in range(board_row_count):
@@ -243,10 +255,11 @@ class Onitama(Game):
         Returns the position from a string representation of the position.
         Input string is StringMode.Readable.
         """
+        
         active_player, red_cards, blue_cards, queued_card, board_string = strposition.split('_')
         pieces = ['' if char == '-' else char for char in board_string]
         board = [pieces[0:3], pieces[3:6], pieces[6:9], pieces[9:12]]
-        pos = OnitamaPosition(set(red_cards.split('-')), set(blue_cards.split('-')), board)
+        pos = OnitamaPosition(set(red_cards.split('-')), set(blue_cards.split('-')), board, self.cards)
         if active_player == 'r':
             pos.active_player = 'red'
             pos.card_in_queue_for_red = queued_card
@@ -323,8 +336,12 @@ class Onitama(Game):
                 queued_card = card
                 
         active_player = 'red' if (hash_val % 2) == 0 else 'blue'
-        
-        pos = OnitamaPosition(red_cards, blue_cards, board)
+        if self._variant_id == "3x4":
+            cards = self.cards_3x4
+        else:
+            cards = self.cards_3x4_balanced
+
+        pos = OnitamaPosition(red_cards, blue_cards, board, self.cards)
 
         pos.active_player = active_player
         # card in queue is for active player
