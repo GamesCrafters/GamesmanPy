@@ -215,11 +215,10 @@ class Onitama(Game):
     #   0-8:   board squares, row-major
     #   9-11:  blue hand left, blue hand right, blue queued card
     #   12-14: red hand left, red hand right, red queued card
-    #   15-32: arrow targets, a left and a right one per square for the left and right hand card,
-    #          so moves to the same square with different cards don't overlap
+    # A piece move is S_<card center>_M_<from>_<to>_x: the GUI shows the arrow only after the
+    # card at <card center> is clicked (selecting a card is not itself a move).
     autogui_blue_slots = 9
     autogui_red_slots = 12
-    autogui_arrow_targets = 15
     # card image characters; red's cards are lowercase, blue's are uppercase (drawn flipped,
     # since blue's moves are rotated 180 degrees on the board)
     autogui_card_chars = {'horse': 'h', 'goose': 'g', 'elephant': 'e', 'mantis': 'n', 'rat': 'r'}
@@ -251,8 +250,7 @@ class Onitama(Game):
                         char = Onitama.autogui_card_chars[card]
                         card_slots += char.upper() if is_blue else char
             turn = '1' if position.active_player == 'red' else '2'
-            arrow_targets = '-' * (2 * len(board))
-            return f"{turn}_{board}{card_slots}{arrow_targets}"
+            return f"{turn}_{board}{card_slots}"
         return repr(position)
 
     def from_string(self, strposition: str) -> OnitamaPosition:
@@ -281,9 +279,10 @@ class Onitama(Game):
             if move.starting_square == move.ending_square:
                 # no piece can move, so the move is just giving up a card: click that card
                 return f"A_-_{hand_start + move.card_slot}_x"
+            # the arrow is only shown once the card it uses is selected
             from_square = move.starting_square[0] * 3 + move.starting_square[1]
             to_square = move.ending_square[0] * 3 + move.ending_square[1]
-            return f"M_{from_square}_{Onitama.autogui_arrow_targets + 2 * to_square + move.card_slot}_x"
+            return f"S_{hand_start + move.card_slot}_M_{from_square}_{to_square}_x"
         return repr(move)
 
     def hash_ext(self, position: OnitamaPosition) -> int:
