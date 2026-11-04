@@ -25,7 +25,7 @@ class Board:
     def getitem(self, index):
         return self.lst[index[0]+2][index[1]+2][index[2]+2]
  
-    def canon(self, index):
+    def untangle(self, index):
         p = index[0] + index[1]
         q = index[1] + index[2]
         if p > 0 and q > 0:
@@ -37,7 +37,7 @@ class Board:
         return (p - j, j, q - j)
  
     def normalize(self, cells):
-        return min(tuple(sorted(self.canon((a - x, b - y, c - z)) for a, b, c in cells)) for x, y, z in cells)
+        return min(tuple(sorted(self.untangle((a - x, b - y, c - z)) for a, b, c in cells)) for x, y, z in cells)
  
     def neighbors(self, index):
         i = index[0]
@@ -48,7 +48,7 @@ class Board:
             for dj in [-1, 0, 1]:
                 for dk in [-1, 0, 1]:
                     if abs(di) + abs(dj) + abs(dk) == 1:
-                        n = self.canon((i + di, j + dj, k + dk))
+                        n = self.untangle((i + di, j + dj, k + dk))
                         if n in self.spaces:
                             neighbors.append(n)
         return neighbors
