@@ -12,6 +12,7 @@ from .sokobaniq import SokobanIQ
 from .sokobanlarge import SokobanLarge
 from .stormyseas import StormySeas
 from .test import Test
+from .onitama import Onitama
 from models import *
 
 game_list = {
@@ -29,6 +30,7 @@ game_list = {
     "sokobanlarge": SokobanLarge,
     "stormyseas": StormySeas,
     "test": Test,
+    "onitama": Onitama,
 }
 
 def validate(game_id: str, variant_id: str) -> bool:
