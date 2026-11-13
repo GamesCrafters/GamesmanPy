@@ -1,6 +1,7 @@
 from .chipschallenge import ChipsChallenge
 from .clobber import Clobber
 from .flowfree import FlowFree
+from .fjords import Fjords
 from .hashi import Hashi
 from .horses import Horses
 from .klotski import Klotski
@@ -18,6 +19,7 @@ game_list = {
     "chipschallenge": ChipsChallenge,
     "clobber": Clobber,
     "flowfree": FlowFree,
+    "fjords": Fjords,
     "hashi": Hashi,
     "horses": Horses,    
     "klotski": Klotski,
