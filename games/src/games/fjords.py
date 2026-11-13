@@ -1,3 +1,4 @@
+import random
 from typing import Optional
 
 from models import Game, Value, StringMode
@@ -19,13 +20,16 @@ class Fjords(Game):
     in row-major order, and a "move"/digit index is an index into that
     list, not a raw board index.
 
-    Both variants are hand-transcribed 25-vertex (5x5, row-major) boards:
-    "regular" is the assignment's reference board, "board2" is a second
-    fixed layout.
+    All boards are 25 vertices (5x5, row-major). "regular" is the
+    assignment's reference board and "board2" is a second hand-transcribed
+    layout. "random1".."random50" are generated with the edge-carving and
+    seed-placement algorithm from the kyleburke.info JS reference, each from
+    a fixed seed so the same variant is always the same board.
     """
 
     id = 'fjords'
-    variants = ["regular", "board2"]
+    n_random_variants = 50
+    variants = ["regular", "board2"] + [f"random{i}" for i in range(1, n_random_variants + 1)]
     n_players = 2
     cyclic = False
 
@@ -60,8 +64,10 @@ class Fjords(Game):
 
         if variant_id == "regular":
             self.board = [[color, list(neighbors)] for color, neighbors in self._REGULAR_BOARD]
-        else:
+        elif variant_id == "board2":
             self.board = [[color, list(neighbors)] for color, neighbors in self._BOARD_2]
+        else:
+            self.board = self._random_board(variant_id)
         self._mutable_indices = [
             i for i, (color, _) in enumerate(self.board) if color == self._UNCOLORED
         ]
@@ -69,6 +75,14 @@ class Fjords(Game):
             board_index: digit for digit, board_index in enumerate(self._mutable_indices)
         }
         self._n_digits = len(self._mutable_indices)
+        # Random boards draw their edges from the AUTOGUI string (one theme
+        # serves every board), so remember which grid edges this board kept.
+        self._draws_edges = variant_id.startswith("random")
+        if self._draws_edges:
+            self._edge_slots = self._grid_edge_slots()
+            self._kept_edges = {
+                (i, j) for i, (_, neighbors) in enumerate(self.board) for j in neighbors if i < j
+            }
 
     # -- Game contract --------------------------------------------------
 
@@ -116,12 +130,22 @@ class Fjords(Game):
         Returns a string representation of the position based on the given mode.
 
         One char per board vertex (row-major): B Blue, R Red, - uncolored.
-        AUTOGUI prefixes the player to move: "1_" Blue, "2_" Red.
+        AUTOGUI prefixes the player to move: "1_" Blue, "2_" Red. For random
+        boards it also starts with one char per possible grid edge (h/r/l by
+        direction, - if carved away) and marks empty vertices "o", so the
+        edges and empty dots are drawn from the string rather than a
+        per-board background image.
         """
         digits = self._unpack(position)
         board = "".join(self._COLOR_TO_CHAR[c] for c in self._effective_colors(digits))
         if mode == StringMode.AUTOGUI:
             turn = "1" if self._turn_code(digits) == self._BLUE else "2"
+            if self._draws_edges:
+                edges = "".join(
+                    direction if (i, j) in self._kept_edges else "-"
+                    for i, j, direction in self._edge_slots
+                )
+                return f"{turn}_{edges}{board.replace('-', 'o')}"
             return f"{turn}_{board}"
         return board
 
@@ -150,7 +174,9 @@ class Fjords(Game):
         """
         vertex = self._mutable_indices[move]
         if mode == StringMode.AUTOGUI:
-            return f"A_-_{vertex}_x"
+            # On random boards the vertex centers come after the edge centers.
+            center = vertex + len(self._edge_slots) if self._draws_edges else vertex
+            return f"A_-_{center}_x"
         return str(vertex)
 
     # -- Position packing -------------------------------------------------
@@ -185,3 +211,208 @@ class Fjords(Game):
             else:
                 colors[i] = digits[self._board_index_to_digit[i]]
         return colors
+
+    # -- Random boards (the "randomN" variants) -----------------------------
+
+    # The server builds a new Fjords object on every request, so generated
+    # boards are cached per variant instead of regenerated each time.
+    _RANDOM_BOARDS: dict = {}
+
+    @classmethod
+    def _random_board(cls, variant_id: str) -> list:
+        if variant_id not in cls._RANDOM_BOARDS:
+            # Retry with the next deterministic seed until neither player is
+            # stuck from the very first move.
+            attempt = 0
+            while True:
+                board = cls._generate_random_board(5, 5, f"{variant_id}#{attempt}")
+                if cls._both_players_can_move(board):
+                    break
+                attempt += 1
+            cls._RANDOM_BOARDS[variant_id] = board
+        return [[color, list(neighbors)] for color, neighbors in cls._RANDOM_BOARDS[variant_id]]
+
+    @classmethod
+    def _both_players_can_move(cls, board: list) -> bool:
+        for player in (cls._BLUE, cls._RED):
+            if not any(
+                color == player and any(board[n][0] == cls._UNCOLORED for n in neighbors)
+                for color, neighbors in board
+            ):
+                return False
+        return True
+
+    @classmethod
+    def _grid_edge_slots(cls) -> list[tuple[int, int, str]]:
+        # Every edge of the full 5x5 grid as sorted (i, j, direction), i < j.
+        # The UWAPI Fjords theme lists its edge centers in this same order.
+        slots = []
+        for (col, row), neighbors in cls._build_base_adjacency(5, 5).items():
+            i = row * 5 + col
+            for ncol, nrow in neighbors:
+                j = nrow * 5 + ncol
+                if i >= j:
+                    continue
+                if nrow == row:
+                    direction = "h"
+                else:
+                    x_i = col + (0.5 if row % 2 == 0 else 0)
+                    x_j = ncol + (0.5 if nrow % 2 == 0 else 0)
+                    direction = "r" if x_j > x_i else "l"
+                slots.append((i, j, direction))
+        return sorted(slots)
+
+    @staticmethod
+    def _variant_seed(seed_text: str) -> int:
+        # Deterministic (not relying on Python's randomized hash()) so the
+        # generated board is identical across processes/runs.
+        seed = 0
+        for ch in seed_text:
+            seed = (seed * 131 + ord(ch)) & 0xFFFFFFFF
+        return seed
+
+    @staticmethod
+    def _base_neighbor_coords(col: int, row: int, width: int, height: int) -> list[tuple[int, int]]:
+        neighbors = []
+        if col > 0:
+            neighbors.append((col - 1, row))
+        if col < width - 1:
+            neighbors.append((col + 1, row))
+        shifted_right = (row % 2 == 0)
+        if row > 0:
+            neighbors.append((col, row - 1))
+            if shifted_right:
+                if col < width - 1:
+                    neighbors.append((col + 1, row - 1))
+            else:
+                if col > 0:
+                    neighbors.append((col - 1, row - 1))
+        if row < height - 1:
+            neighbors.append((col, row + 1))
+            if shifted_right:
+                if col < width - 1:
+                    neighbors.append((col + 1, row + 1))
+            else:
+                if col > 0:
+                    neighbors.append((col - 1, row + 1))
+        return neighbors
+
+    @classmethod
+    def _build_base_adjacency(cls, width: int, height: int) -> dict:
+        vertices = [(col, row) for row in range(height) for col in range(width)]
+        adjacency = {v: set() for v in vertices}
+        # Union both directions' proposals so the result is always
+        # symmetric, matching the reference's edge-set construction.
+        for (col, row) in vertices:
+            for neighbor in cls._base_neighbor_coords(col, row, width, height):
+                adjacency[(col, row)].add(neighbor)
+                adjacency[neighbor].add((col, row))
+        return adjacency
+
+    @staticmethod
+    def _is_connected(vertices: set, adjacency: dict) -> bool:
+        if not vertices:
+            return True
+        start = next(iter(vertices))
+        seen = {start}
+        queue = [start]
+        while queue:
+            current = queue.pop()
+            for neighbor in adjacency[current]:
+                if neighbor not in seen:
+                    seen.add(neighbor)
+                    queue.append(neighbor)
+        return len(seen) == len(vertices)
+
+    @classmethod
+    def _carve_fjords(cls, vertices: set, adjacency: dict, width: int, height: int, rng: random.Random) -> None:
+        for _ in range(width * height):
+            vertex = (rng.randrange(width), rng.randrange(height))
+            if vertex not in vertices:
+                continue
+            neighbors = sorted(adjacency[vertex])
+            if not neighbors:
+                continue
+            neighbor = rng.choice(neighbors)
+            adjacency[vertex].discard(neighbor)
+            adjacency[neighbor].discard(vertex)
+            if not cls._is_connected(vertices, adjacency):
+                # Reverting keeps every vertex at degree >= 1, so the
+                # "isolated vertex" case from the reference implementation
+                # can never actually occur here.
+                adjacency[vertex].add(neighbor)
+                adjacency[neighbor].add(vertex)
+
+    @classmethod
+    def _place_seeds(cls, vertices: set, width: int, height: int, rng: random.Random) -> dict:
+        colors = {v: cls._UNCOLORED for v in vertices}
+
+        center_col = (width - 1) / 2
+        center_row = (height - 1) / 2
+        if center_row % 2 == 0:
+            center_col += 0.5
+        elif center_row % 1 == 0.5:
+            center_col += 0.25
+
+        def hex_distance(col: float, row: float) -> float:
+            col_shifted = col + (0.5 if row % 2 == 0 else 0)
+            row_dist = abs(row - center_row)
+            col_dist = abs(col_shifted - center_col)
+            return row_dist + max(0.0, col_dist - row_dist / 2)
+
+        threshold = (width + height) / 3
+        placed = 0
+        while placed < threshold:
+            blue_vertex = None
+            red_vertex = None
+            while True:
+                blue_col, blue_row = rng.randrange(width), rng.randrange(height)
+                blue_candidate = (blue_col, blue_row)
+                if blue_candidate not in vertices or colors[blue_candidate] != cls._UNCOLORED:
+                    continue
+                blue_distance = hex_distance(blue_col, blue_row)
+
+                red_row = rng.randrange(height)
+                candidate_cols = [
+                    col for col in range(width)
+                    if abs(hex_distance(col, red_row) - blue_distance) < 1e-9
+                ]
+                rng.shuffle(candidate_cols)
+
+                found = False
+                for col in candidate_cols:
+                    candidate = (col, red_row)
+                    if (candidate in vertices and colors[candidate] == cls._UNCOLORED
+                            and candidate != blue_candidate):
+                        red_vertex = candidate
+                        found = True
+                        break
+
+                if found:
+                    blue_vertex = blue_candidate
+                    break
+
+            colors[blue_vertex] = cls._BLUE
+            colors[red_vertex] = cls._RED
+            placed += 1
+
+        return colors
+
+    @classmethod
+    def _generate_random_board(cls, width: int, height: int, seed_text: str) -> list:
+        rng = random.Random(cls._variant_seed(seed_text))
+        adjacency_by_coord = cls._build_base_adjacency(width, height)
+        vertices = set(adjacency_by_coord.keys())
+        cls._carve_fjords(vertices, adjacency_by_coord, width, height, rng)
+        colors_by_coord = cls._place_seeds(vertices, width, height, rng)
+
+        def index(col: int, row: int) -> int:
+            return row * width + col
+
+        board = []
+        for row in range(height):
+            for col in range(width):
+                color = colors_by_coord[(col, row)]
+                neighbors = sorted(index(nc, nr) for (nc, nr) in adjacency_by_coord[(col, row)])
+                board.append([color, neighbors])
+        return board
